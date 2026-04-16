@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminQueries } from '@/hooks/useAdminQueries';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -15,69 +19,123 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'approvals' | 'members' | 'roles' | 'analytics' | 'create'>('approvals');
+  const [activeTab, setActiveTab] = useState<'approvals' | 'members' | 'roles' | 'analytics'>('approvals');
+  
+  // Use consolidated queries hook
+  const { pending, members, roles, analytics } = useAdminQueries();
 
-  // Pending changes
-  const { data: pending } = useQuery({
-    queryKey: ['admin-pending'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('pending_changes')
-        .select('*, members(name)')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
-      return data || [];
-    },
-  });
+  // Edit member dialog state
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editInstagram, setEditInstagram] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editPortraitUrl, setEditPortraitUrl] = useState('');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // All members
-  const { data: members } = useQuery({
-    queryKey: ['admin-members'],
-    queryFn: async () => {
-      const { data } = await supabase
+  // New member state
+  const [newRoleName, setNewRoleName] = useState('');
+
+  // Open edit dialog
+  const openEditDialog = (member: any) => {
+    setEditingMember(member);
+    setEditName(member.name || '');
+    setEditBio(member.bio || '');
+    setEditInstagram(member.instagram_url || '');
+    setEditWebsite(member.website_url || '');
+    setEditSlug(member.slug || '');
+    setEditPortraitUrl(member.portrait_url || '');
+    setIsEditDialogOpen(true);
+  };
+
+  // Save member edits
+  const saveMemberEdits = async () => {
+    if (!editingMember) return;
+
+    try {
+      const { error } = await supabase
         .from('members')
-        .select('*')
-        .order('display_order');
-      return data || [];
-    },
-  });
+        .update({
+          name: editName,
+          bio: editBio,
+          instagram_url: editInstagram,
+          website_url: editWebsite,
+          slug: editSlug,
+          portrait_url: editPortraitUrl,
+        })
+        .eq('id', editingMember.id);
 
-  // Available roles
-  const { data: roles } = useQuery({
-    queryKey: ['admin-roles'],
-    queryFn: async () => {
-      const { data } = await supabase.from('available_roles').select('*').order('name');
-      return data || [];
-    },
-  });
+      if (error) throw error;
 
-  // Analytics
-  const { data: analytics } = useQuery({
-    queryKey: ['admin-analytics'],
-    queryFn: async () => {
-      const { data: events } = await supabase
-        .from('analytics_events')
-        .select('event_type, member_id, members(name)')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      toast({ title: 'Success', description: 'Member updated successfully' });
+      setIsEditDialogOpen(false);
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Upload portrait image
+  const handlePortraitUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !editingMember) return;
+    const file = e.target.files[0];
+    
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `portraits/${editingMember.id}_${Date.now()}.${ext}`;
       
-      const totalViews = events?.filter(e => e.event_type === 'page_view').length || 0;
-      const totalClicks = events?.filter(e => e.event_type === 'link_click').length || 0;
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(path, file);
       
-      // Per member breakdown
-      const perMember: Record<string, { name: string; views: number; clicks: number }> = {};
-      events?.forEach((e: any) => {
-        if (!e.member_id) return;
-        if (!perMember[e.member_id]) {
-          perMember[e.member_id] = { name: e.members?.name || 'Unknown', views: 0, clicks: 0 };
-        }
-        if (e.event_type === 'page_view') perMember[e.member_id].views++;
-        else perMember[e.member_id].clicks++;
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(path);
+
+      setEditPortraitUrl(publicUrl);
+      toast({ title: 'Success', description: 'Portrait uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Delete member
+  const deleteMember = async (memberId: string, memberName: string) => {
+    try {
+      // Delete member_roles first (foreign key constraint)
+      await supabase.from('member_roles').delete().eq('member_id', memberId);
+      
+      // Delete member_works
+      await supabase.from('member_works').delete().eq('member_id', memberId);
+      
+      // Delete pending_changes
+      await supabase.from('pending_changes').delete().eq('member_id', memberId);
+      
+      // Delete analytics_events
+      await supabase.from('analytics_events').delete().eq('member_id', memberId);
+      
+      // Finally delete the member
+      const { error } = await supabase.from('members').delete().eq('id', memberId);
+      
+      if (error) throw error;
+
+      toast({ 
+        title: 'Deleted', 
+        description: `${memberName} has been removed` 
       });
-
-      return { totalViews, totalClicks, perMember };
-    },
-  });
+      
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ 
+        title: 'Error', 
+        description: err.message, 
+        variant: 'destructive' 
+      });
+    }
+  };
 
   const approveChange = async (change: any) => {
     const { change_type, change_data, member_id, id } = change;
@@ -113,7 +171,11 @@ const AdminDashboard = () => {
         await supabase.from('members').update({ portrait_url: data.portrait_url }).eq('id', member_id);
       }
 
-      await supabase.from('pending_changes').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
+      await supabase.from('pending_changes').update({ 
+        status: 'approved', 
+        reviewed_at: new Date().toISOString() 
+      }).eq('id', id);
+      
       toast({ title: 'Approved' });
       qc.invalidateQueries({ queryKey: ['admin-pending'] });
       qc.invalidateQueries({ queryKey: ['admin-members'] });
@@ -123,7 +185,11 @@ const AdminDashboard = () => {
   };
 
   const rejectChange = async (id: string) => {
-    await supabase.from('pending_changes').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
+    await supabase.from('pending_changes').update({ 
+      status: 'rejected', 
+      reviewed_at: new Date().toISOString() 
+    }).eq('id', id);
+    
     toast({ title: 'Rejected' });
     qc.invalidateQueries({ queryKey: ['admin-pending'] });
   };
@@ -131,6 +197,10 @@ const AdminDashboard = () => {
   const toggleLock = async (memberId: string, currentLock: boolean) => {
     await supabase.from('members').update({ editing_locked: !currentLock }).eq('id', memberId);
     qc.invalidateQueries({ queryKey: ['admin-members'] });
+    toast({ 
+      title: currentLock ? 'Unlocked' : 'Locked',
+      description: currentLock ? 'Member can now edit their profile' : 'Member editing disabled'
+    });
   };
 
   const updateTitle = async (memberId: string, title: string) => {
@@ -150,19 +220,6 @@ const AdminDashboard = () => {
       supabase.from('members').update({ display_order: members[idx].display_order }).eq('id', members[swapIdx].id),
     ]);
     qc.invalidateQueries({ queryKey: ['admin-members'] });
-  };
-
-  // Create member
-  const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newRoleName, setNewRoleName] = useState('');
-
-  const createMember = async () => {
-    if (!newEmail || !newPassword || !newName) return;
-    // Note: In production, use an edge function to create users via admin API
-    // For now we create via signUp then immediately set role
-    toast({ title: 'Note', description: 'Member account creation requires the Supabase admin API. Use the Cloud dashboard to create user accounts, then add them as members here.' });
   };
 
   const addRole = async () => {
@@ -191,11 +248,19 @@ const AdminDashboard = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background px-6 py-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-background px-6 py-8 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="font-heading text-foreground text-2xl tracking-wider">Admin</h1>
-          <Button variant="ghost" onClick={async () => { await signOut(); navigate('/'); }} className="text-muted-foreground hover:text-foreground">
-            <LogOut size={18} />
+          <h1 className="font-heading text-foreground text-2xl tracking-wider">Admin Dashboard</h1>
+          <Button 
+            variant="ghost" 
+            onClick={async () => { 
+              await signOut(); 
+              navigate('/'); 
+            }} 
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut size={18} className="mr-2" />
+            Logout
           </Button>
         </div>
 
@@ -206,7 +271,9 @@ const AdminDashboard = () => {
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               className={`font-heading text-sm tracking-widest px-4 py-2 border-b-2 transition-colors ${
-                activeTab === t.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+                activeTab === t.id 
+                  ? 'border-primary text-foreground' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {t.label}
@@ -215,13 +282,18 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Approvals */}
+        {/* Approvals Tab */}
         {activeTab === 'approvals' && (
           <div className="space-y-3">
-            {pending?.length === 0 && <p className="text-muted-foreground text-sm">No pending changes.</p>}
+            {pending?.length === 0 && (
+              <div className="text-center py-12">
+                <Check className="mx-auto h-12 w-12 text-green-500 mb-3" />
+                <p className="text-muted-foreground text-sm">No pending changes</p>
+              </div>
+            )}
             {pending?.map((pc: any) => (
-              <div key={pc.id} className="bg-card border border-border rounded p-4">
-                <div className="flex items-center justify-between mb-2">
+              <div key={pc.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <span className="text-foreground font-heading tracking-wider text-sm">
                       {pc.members?.name || 'Unknown'}
@@ -229,78 +301,214 @@ const AdminDashboard = () => {
                     <span className="text-muted-foreground text-xs ml-2 capitalize">
                       {pc.change_type.replace('_', ' ')}
                     </span>
+                    <span className="text-muted-foreground text-xs ml-2">
+                      • {new Date(pc.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => approveChange(pc)} className="text-green-500 hover:text-green-400 hover:bg-green-500/10">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => approveChange(pc)} 
+                      className="text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                      title="Approve"
+                    >
                       <Check size={16} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => rejectChange(pc.id)} className="text-destructive hover:bg-destructive/10">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => rejectChange(pc.id)} 
+                      className="text-destructive hover:bg-destructive/10"
+                      title="Reject"
+                    >
                       <X size={16} />
                     </Button>
                   </div>
                 </div>
-                <pre className="text-muted-foreground text-xs overflow-auto">
-                  {JSON.stringify(pc.change_data, null, 2)}
-                </pre>
+                <div className="bg-muted/30 rounded p-3">
+                  <pre className="text-muted-foreground text-xs overflow-auto whitespace-pre-wrap">
+                    {JSON.stringify(pc.change_data, null, 2)}
+                  </pre>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Members */}
+        {/* Members Tab */}
         {activeTab === 'members' && (
           <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                {members?.length || 0} member{members?.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            
             {members?.map((m, i) => (
-              <div key={m.id} className="bg-card border border-border rounded p-4 flex items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <button onClick={() => moveOrder(m.id, 'up')} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
-                    <ChevronUp size={14} />
-                  </button>
-                  <button onClick={() => moveOrder(m.id, 'down')} disabled={i === (members?.length || 0) - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
-                    <ChevronDown size={14} />
-                  </button>
+              <div key={m.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/30 transition-colors">
+                <div className="flex items-center gap-4">
+                  {/* Drag Handle */}
+                  <div className="flex flex-col gap-1">
+                    <button 
+                      onClick={() => moveOrder(m.id, 'up')} 
+                      disabled={i === 0} 
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Move up"
+                      title="Move up"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button 
+                      onClick={() => moveOrder(m.id, 'down')} 
+                      disabled={i === (members?.length || 0) - 1} 
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Move down"
+                      title="Move down"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  </div>
+
+                  {/* Portrait */}
+                  {m.portrait_url && (
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                      <img 
+                        src={m.portrait_url} 
+                        alt={m.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  {!m.portrait_url && (
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <ImageIcon size={20} className="text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Member Info */}
+                  <div className="flex-1">
+                    <p className="text-foreground font-heading tracking-wider">{m.name}</p>
+                    <p className="text-muted-foreground text-xs">@{m.slug}</p>
+                  </div>
+
+                  {/* Title Select */}
+                  <Select defaultValue={m.title} onValueChange={(v) => updateTitle(m.id, v)}>
+                    <SelectTrigger className="w-32 bg-card border-border text-foreground text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Founder">Founder</SelectItem>
+                      <SelectItem value="Partner">Partner</SelectItem>
+                      <SelectItem value="Member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => navigate(`/member/${m.slug}`)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="View profile"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => openEditDialog(m)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Edit member"
+                    >
+                      <Edit size={16} />
+                    </Button>
+
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => toggleLock(m.id, m.editing_locked)} 
+                      className={m.editing_locked ? 'text-destructive' : 'text-muted-foreground'}
+                      title={m.editing_locked ? "Unlock editing" : "Lock editing"}
+                    >
+                      {m.editing_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                    </Button>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10"
+                          title="Delete member"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {m.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this member and all their content (works, pending changes, analytics). This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMember(m.id, m.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-foreground font-heading tracking-wider">{m.name}</p>
-                  <p className="text-muted-foreground text-xs">{m.title}</p>
-                </div>
-                <Select defaultValue={m.title} onValueChange={(v) => updateTitle(m.id, v)}>
-                  <SelectTrigger className="w-32 bg-card border-border text-foreground text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Founder">Founder</SelectItem>
-                    <SelectItem value="Partner">Partner</SelectItem>
-                    <SelectItem value="Member">Member</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" variant="ghost" onClick={() => toggleLock(m.id, m.editing_locked)} className={m.editing_locked ? 'text-destructive' : 'text-muted-foreground'}>
-                  {m.editing_locked ? <Lock size={16} /> : <Unlock size={16} />}
-                </Button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Roles */}
+        {/* Roles Tab */}
         {activeTab === 'roles' && (
           <div>
             <div className="flex gap-2 mb-4">
               <Input
-                placeholder="New role name"
+                placeholder="New role name (e.g., Designer, Developer)"
                 value={newRoleName}
                 onChange={(e) => setNewRoleName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addRole()}
                 className="bg-card border-border text-foreground placeholder:text-muted-foreground max-w-xs"
               />
-              <Button onClick={addRole} size="sm" className="bg-primary text-primary-foreground font-heading tracking-widest">
-                <Plus size={14} />
+              <Button 
+                onClick={addRole} 
+                size="sm" 
+                className="bg-primary text-primary-foreground font-heading tracking-widest"
+              >
+                <Plus size={14} className="mr-1" />
+                Add Role
               </Button>
             </div>
+            
             <div className="space-y-2">
+              {roles?.length === 0 && (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No roles yet. Add roles that members can select (e.g., Designer, Developer, Writer).
+                </p>
+              )}
               {roles?.map((r) => (
-                <div key={r.id} className="flex items-center justify-between bg-card border border-border rounded p-3">
-                  <span className="text-foreground text-sm">{r.name}</span>
-                  <Button size="sm" variant="ghost" onClick={() => deleteRole(r.id)} className="text-destructive hover:bg-destructive/10">
+                <div key={r.id} className="flex items-center justify-between bg-card border border-border rounded-lg p-3 hover:border-primary/30 transition-colors">
+                  <span className="text-foreground text-sm font-medium">{r.name}</span>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => deleteRole(r.id)} 
+                    className="text-destructive hover:bg-destructive/10"
+                    aria-label={`Delete ${r.name}`}
+                  >
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -309,36 +517,146 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Analytics */}
+        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-card border border-border rounded p-4">
-                <p className="text-muted-foreground text-xs uppercase tracking-widest">Total Views</p>
-                <p className="text-foreground font-heading text-3xl mt-1">{analytics?.totalViews || 0}</p>
+              <div className="bg-card border border-border rounded-lg p-6">
+                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Views</p>
+                <p className="text-foreground font-heading text-4xl">{analytics?.totalViews || 0}</p>
               </div>
-              <div className="bg-card border border-border rounded p-4">
-                <p className="text-muted-foreground text-xs uppercase tracking-widest">Total Clicks</p>
-                <p className="text-foreground font-heading text-3xl mt-1">{analytics?.totalClicks || 0}</p>
+              <div className="bg-card border border-border rounded-lg p-6">
+                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Clicks</p>
+                <p className="text-foreground font-heading text-4xl">{analytics?.totalClicks || 0}</p>
               </div>
             </div>
-            <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Per Member</h3>
+            
+            <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Per Member Analytics</h3>
             <div className="space-y-2">
               {analytics?.perMember && Object.entries(analytics.perMember).map(([id, data]) => (
-                <div key={id} className="bg-card border border-border rounded p-3 flex items-center justify-between">
-                  <span className="text-foreground text-sm">{data.name}</span>
-                  <div className="flex gap-4 text-muted-foreground text-xs">
-                    <span>{data.views} views</span>
-                    <span>{data.clicks} clicks</span>
+                <div key={id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
+                  <span className="text-foreground font-medium">{data.name}</span>
+                  <div className="flex gap-6 text-muted-foreground text-sm">
+                    <span className="flex items-center gap-2">
+                      <Eye size={14} />
+                      {data.views} views
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary"></span>
+                      {data.clicks} clicks
+                    </span>
                   </div>
                 </div>
               ))}
               {analytics?.perMember && Object.keys(analytics.perMember).length === 0 && (
-                <p className="text-muted-foreground text-sm">No analytics data yet.</p>
+                <p className="text-muted-foreground text-sm text-center py-8">No analytics data yet.</p>
               )}
             </div>
           </div>
         )}
+
+        {/* Edit Member Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Member: {editingMember?.name}</DialogTitle>
+              <DialogDescription>
+                Make changes to this member's profile. Changes are saved immediately.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Portrait Upload */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Profile Portrait</label>
+                <div className="flex items-center gap-4">
+                  {editPortraitUrl && (
+                    <img 
+                      src={editPortraitUrl} 
+                      alt="Portrait preview" 
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  )}
+                  <label className="cursor-pointer">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                      <Upload size={16} />
+                      <span className="text-sm">Upload Portrait</span>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handlePortraitUpload}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Name</label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Member name"
+                  className="bg-card"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Slug (URL)</label>
+                <Input
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="member-slug"
+                  className="bg-card font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL: /member/{editSlug || 'slug'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Bio</label>
+                <Textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  placeholder="Member bio"
+                  rows={4}
+                  className="bg-card resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Instagram URL</label>
+                <Input
+                  value={editInstagram}
+                  onChange={(e) => setEditInstagram(e.target.value)}
+                  placeholder="https://instagram.com/username"
+                  className="bg-card"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Website URL</label>
+                <Input
+                  value={editWebsite}
+                  onChange={(e) => setEditWebsite(e.target.value)}
+                  placeholder="https://example.com"
+                  className="bg-card"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveMemberEdits} className="bg-primary">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageTransition>
   );
