@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useMemberDashboard } from '@/hooks/useMemberDashboard';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { LogOut } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LogOut, Upload, Check, Clock, X, TrendingUp, MousePointerClick } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -17,81 +20,16 @@ const MemberDashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch member data
-  const { data: member, isLoading: memberLoading } = useQuery({
-    queryKey: ['dashboard-member', memberId],
-    queryFn: async () => {
-      if (!memberId) return null;
-      const { data } = await supabase.from('members').select('*').eq('id', memberId).single();
-      return data;
-    },
-    enabled: !!memberId,
-  });
-
-  // Fetch available roles
-  const { data: availableRoles } = useQuery({
-    queryKey: ['available-roles'],
-    queryFn: async () => {
-      const { data } = await supabase.from('available_roles').select('*');
-      return data || [];
-    },
-  });
-
-  // Fetch member's current roles
-  const { data: memberRoles } = useQuery({
-    queryKey: ['member-roles', memberId],
-    queryFn: async () => {
-      if (!memberId) return [];
-      const { data } = await supabase.from('member_roles').select('role_id').eq('member_id', memberId);
-      return data?.map((r) => r.role_id) || [];
-    },
-    enabled: !!memberId,
-  });
-
-  // Fetch pending changes
-  const { data: pendingChanges } = useQuery({
-    queryKey: ['pending-changes', memberId],
-    queryFn: async () => {
-      if (!memberId) return [];
-      const { data } = await supabase
-        .from('pending_changes')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      return data || [];
-    },
-    enabled: !!memberId,
-  });
-
-  // Fetch member works
-  const { data: works } = useQuery({
-    queryKey: ['member-works-dashboard', memberId],
-    queryFn: async () => {
-      if (!memberId) return [];
-      const { data } = await supabase
-        .from('member_works')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('display_order');
-      return data || [];
-    },
-    enabled: !!memberId,
-  });
-
-  // Analytics
-  const { data: analytics } = useQuery({
-    queryKey: ['member-analytics', memberId],
-    queryFn: async () => {
-      if (!memberId) return { views: 0, clicks: 0 };
-      const [views, clicks] = await Promise.all([
-        supabase.from('analytics_events').select('id', { count: 'exact', head: true }).eq('member_id', memberId).eq('event_type', 'page_view'),
-        supabase.from('analytics_events').select('id', { count: 'exact', head: true }).eq('member_id', memberId).eq('event_type', 'link_click'),
-      ]);
-      return { views: views.count || 0, clicks: clicks.count || 0 };
-    },
-    enabled: !!memberId,
-  });
+  // Use consolidated queries hook
+  const {
+    member,
+    availableRoles,
+    memberRoles,
+    pendingChanges,
+    works,
+    analytics,
+    isLoading: memberLoading,
+  } = useMemberDashboard(memberId);
 
   const [bio, setBio] = useState('');
   const [instagram, setInstagram] = useState('');
@@ -119,40 +57,82 @@ const MemberDashboard = () => {
 
   const submitChange = async (changeType: string, changeData: Record<string, any>) => {
     if (!memberId || isLocked) return;
-    const { error } = await supabase.from('pending_changes').insert({
-      member_id: memberId,
-      change_type: changeType,
-      change_data: changeData,
-    });
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Submitted', description: 'Your changes are pending admin approval.' });
+    
+    try {
+      const { error } = await supabase.from('pending_changes').insert({
+        member_id: memberId,
+        change_type: changeType,
+        change_data: changeData,
+      });
+      
+      if (error) throw error;
+
+      toast({ 
+        title: 'Submitted for Approval', 
+        description: 'Your changes will be reviewed by an admin.' 
+      });
+      
       queryClient.invalidateQueries({ queryKey: ['pending-changes'] });
+    } catch (err: any) {
+      toast({ 
+        title: 'Error', 
+        description: err.message, 
+        variant: 'destructive' 
+      });
     }
   };
 
-  const handleSaveBio = () => submitChange('bio', { bio });
-  const handleSaveLinks = () => submitChange('links', { instagram_url: instagram, website_url: website });
-  const handleSaveRoles = () => submitChange('roles', { role_ids: selectedRoles });
+  const handleSaveBio = () => {
+    if (!bio.trim()) {
+      toast({ 
+        title: 'Error', 
+        description: 'Bio cannot be empty', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+    submitChange('bio', { bio });
+  };
+
+  const handleSaveLinks = () => {
+    submitChange('links', { instagram_url: instagram, website_url: website });
+  };
+
+  const handleSaveRoles = () => {
+    submitChange('roles', { role_ids: selectedRoles });
+  };
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !memberId) return;
     const file = e.target.files[0];
     const currentCount = works?.length || 0;
+    
     if (currentCount >= 6) {
-      toast({ title: 'Limit reached', description: 'Maximum 6 works allowed.', variant: 'destructive' });
+      toast({ 
+        title: 'Limit Reached', 
+        description: 'You can only upload up to 6 works.', 
+        variant: 'destructive' 
+      });
       return;
     }
-    const ext = file.name.split('.').pop();
-    const path = `${memberId}/${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from('media').upload(path, file);
-    if (uploadError) {
-      toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' });
-      return;
+
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${memberId}/${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage.from('media').upload(path, file);
+      
+      if (uploadError) throw uploadError;
+
+      const type = file.type.startsWith('video') ? 'video' : 'image';
+      await submitChange('media_add', { storage_path: path, type });
+    } catch (err: any) {
+      toast({ 
+        title: 'Upload Failed', 
+        description: err.message, 
+        variant: 'destructive' 
+      });
     }
-    const type = file.type.startsWith('video') ? 'video' : 'image';
-    await submitChange('media_add', { storage_path: path, type });
   };
 
   const handleLogout = async () => {
@@ -160,140 +140,317 @@ const MemberDashboard = () => {
     navigate('/');
   };
 
-  if (memberLoading) return <div className="min-h-screen bg-background" />;
+  if (memberLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading your dashboard...</div>
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <span className="flex items-center gap-1 text-xs text-green-500">
+            <Check size={12} />
+            Approved
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="flex items-center gap-1 text-xs text-destructive">
+            <X size={12} />
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="flex items-center gap-1 text-xs text-yellow-500">
+            <Clock size={12} />
+            Pending
+          </span>
+        );
+    }
+  };
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background px-6 py-8 max-w-2xl mx-auto">
+      <div className="min-h-screen bg-background px-6 py-8 max-w-4xl mx-auto">
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="font-heading text-foreground text-2xl tracking-wider">Dashboard</h1>
-          <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-            <LogOut size={18} />
+          <div>
+            <h1 className="font-heading text-foreground text-2xl tracking-wider">
+              Welcome, {member?.name}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Manage your profile and view analytics
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleLogout} 
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut size={18} className="mr-2" />
+            Logout
           </Button>
         </div>
 
+        {/* Locked Warning */}
         {isLocked && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded p-4 mb-6">
-            <p className="text-destructive text-sm">Your editing access has been disabled by an admin.</p>
-          </div>
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>
+              Your editing access has been temporarily disabled by an administrator. Please contact an admin for more information.
+            </AlertDescription>
+          </Alert>
         )}
 
-        {/* Analytics */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-card border border-border rounded p-4">
-            <p className="text-muted-foreground text-xs uppercase tracking-widest">Page Views</p>
-            <p className="text-foreground font-heading text-2xl mt-1">{analytics?.views || 0}</p>
-          </div>
-          <div className="bg-card border border-border rounded p-4">
-            <p className="text-muted-foreground text-xs uppercase tracking-widest">Link Clicks</p>
-            <p className="text-foreground font-heading text-2xl mt-1">{analytics?.clicks || 0}</p>
-          </div>
+        {/* Analytics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Profile Views
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">
+                {analytics?.views || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total profile page visits
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Link Clicks
+              </CardTitle>
+              <MousePointerClick className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">
+                {analytics?.clicks || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Instagram & website clicks
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Bio */}
-        <section className="mb-8">
-          <h2 className="font-heading text-foreground text-lg tracking-wider mb-3">Bio</h2>
-          <Textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            disabled={isLocked}
-            className="bg-card border-border text-foreground mb-2 resize-none"
-            rows={3}
-          />
-          <Button onClick={handleSaveBio} disabled={isLocked} size="sm" className="bg-primary text-primary-foreground font-heading tracking-widest">
-            Submit Bio
-          </Button>
-        </section>
-
-        {/* Links */}
-        <section className="mb-8">
-          <h2 className="font-heading text-foreground text-lg tracking-wider mb-3">Links</h2>
-          <div className="space-y-2 mb-2">
-            <Input
-              placeholder="Instagram URL"
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
+        {/* Edit Bio Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Biography</CardTitle>
+            <CardDescription>
+              Update your bio to tell visitors about yourself
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
               disabled={isLocked}
-              className="bg-card border-border text-foreground placeholder:text-muted-foreground"
+              placeholder="Write something about yourself..."
+              className="bg-card border-border text-foreground min-h-[100px] resize-none"
+              maxLength={500}
             />
-            <Input
-              placeholder="Website URL"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              disabled={isLocked}
-              className="bg-card border-border text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-          <Button onClick={handleSaveLinks} disabled={isLocked} size="sm" className="bg-primary text-primary-foreground font-heading tracking-widest">
-            Submit Links
-          </Button>
-        </section>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {bio.length}/500 characters
+              </p>
+              <Button 
+                onClick={handleSaveBio} 
+                disabled={isLocked || !bio.trim()} 
+                size="sm" 
+                className="bg-primary text-primary-foreground"
+              >
+                Submit Bio Change
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Roles */}
-        <section className="mb-8">
-          <h2 className="font-heading text-foreground text-lg tracking-wider mb-3">Roles</h2>
-          <div className="space-y-2 mb-2">
-            {availableRoles?.map((r) => (
-              <label key={r.id} className="flex items-center gap-2 text-foreground text-sm cursor-pointer">
-                <Checkbox
-                  checked={selectedRoles.includes(r.id)}
-                  onCheckedChange={(checked) => {
-                    setSelectedRoles((prev) =>
-                      checked ? [...prev, r.id] : prev.filter((id) => id !== r.id)
-                    );
-                  }}
-                  disabled={isLocked}
-                />
-                {r.name}
-              </label>
-            ))}
-          </div>
-          <Button onClick={handleSaveRoles} disabled={isLocked} size="sm" className="bg-primary text-primary-foreground font-heading tracking-widest">
-            Submit Roles
-          </Button>
-        </section>
+        {/* Edit Links Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Social Links</CardTitle>
+            <CardDescription>
+              Add your Instagram and website links
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Instagram URL</label>
+              <Input
+                placeholder="https://instagram.com/yourusername"
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                disabled={isLocked}
+                className="bg-card border-border text-foreground"
+                type="url"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Website URL</label>
+              <Input
+                placeholder="https://yourwebsite.com"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                disabled={isLocked}
+                className="bg-card border-border text-foreground"
+                type="url"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSaveLinks} 
+                disabled={isLocked} 
+                size="sm" 
+                className="bg-primary text-primary-foreground"
+              >
+                Submit Link Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Media Upload */}
-        <section className="mb-8">
-          <h2 className="font-heading text-foreground text-lg tracking-wider mb-3">
-            Media ({works?.length || 0}/6)
-          </h2>
-          {!isLocked && (works?.length || 0) < 6 && (
-            <label className="block cursor-pointer">
-              <div className="bg-card border border-dashed border-border rounded p-6 text-center text-muted-foreground text-sm hover:border-primary/50 transition-colors">
-                Click to upload image or video
+        {/* Edit Roles Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Your Roles</CardTitle>
+            <CardDescription>
+              Select the roles that describe what you do
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {availableRoles && availableRoles.length > 0 ? (
+              <div className="space-y-3">
+                {availableRoles.map((r) => (
+                  <label 
+                    key={r.id} 
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={selectedRoles.includes(r.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedRoles((prev) =>
+                          checked ? [...prev, r.id] : prev.filter((id) => id !== r.id)
+                        );
+                      }}
+                      disabled={isLocked}
+                    />
+                    <span className="text-foreground font-medium">{r.name}</span>
+                  </label>
+                ))}
               </div>
-              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaUpload} />
-            </label>
-          )}
-        </section>
+            ) : (
+              <p className="text-muted-foreground text-sm text-center py-4">
+                No roles available yet. Contact an admin to add roles.
+              </p>
+            )}
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSaveRoles} 
+                disabled={isLocked || !availableRoles?.length} 
+                size="sm" 
+                className="bg-primary text-primary-foreground"
+              >
+                Submit Role Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Pending Changes */}
-        <section>
-          <h2 className="font-heading text-foreground text-lg tracking-wider mb-3">Recent Submissions</h2>
-          {pendingChanges?.length === 0 && (
-            <p className="text-muted-foreground text-sm">No submissions yet.</p>
-          )}
-          <div className="space-y-2">
-            {pendingChanges?.map((pc) => (
-              <div key={pc.id} className="bg-card border border-border rounded p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-foreground text-sm capitalize">{pc.change_type.replace('_', ' ')}</span>
-                  <span className="text-muted-foreground text-xs ml-2">
-                    {new Date(pc.created_at).toLocaleDateString()}
-                  </span>
+        {/* Media Upload Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Portfolio Works ({works?.length || 0}/6)</CardTitle>
+            <CardDescription>
+              Upload images or videos to showcase your work (max 6)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!isLocked && (works?.length || 0) < 6 ? (
+              <label className="block cursor-pointer group">
+                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors group-hover:bg-muted/30">
+                  <Upload className="mx-auto h-12 w-12 text-muted-foreground group-hover:text-primary transition-colors mb-3" />
+                  <p className="text-foreground font-medium mb-1">
+                    Click to upload image or video
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Supported formats: JPG, PNG, GIF, MP4, MOV
+                  </p>
                 </div>
-                <span className={`text-xs uppercase tracking-widest ${
-                  pc.status === 'approved' ? 'text-green-500' :
-                  pc.status === 'rejected' ? 'text-destructive' :
-                  'text-yellow-500'
-                }`}>
-                  {pc.status}
-                </span>
+                <input 
+                  type="file" 
+                  accept="image/*,video/*" 
+                  className="hidden" 
+                  onChange={handleMediaUpload} 
+                />
+              </label>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                {isLocked ? (
+                  <p>Upload disabled - editing is locked</p>
+                ) : (
+                  <p>Maximum of 6 works reached</p>
+                )}
               </div>
-            ))}
-          </div>
-        </section>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Submissions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Submissions</CardTitle>
+            <CardDescription>
+              Track the status of your change requests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {pendingChanges && pendingChanges.length > 0 ? (
+              <div className="space-y-3">
+                {pendingChanges.map((pc) => (
+                  <div 
+                    key={pc.id} 
+                    className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-primary/30 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="text-foreground font-medium capitalize">
+                        {pc.change_type.replace('_', ' ')}
+                      </p>
+                      <p className="text-muted-foreground text-xs mt-1">
+                        Submitted {new Date(pc.created_at).toLocaleDateString()} at{' '}
+                        {new Date(pc.created_at).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      {getStatusBadge(pc.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-3 opacity-50" />
+                <p className="text-muted-foreground">No submissions yet</p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Changes you submit will appear here for admin review
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </PageTransition>
   );
