@@ -13,7 +13,6 @@ import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, E
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-
 const AdminDashboard = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
