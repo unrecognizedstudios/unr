@@ -24,7 +24,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchRoleAndMember = async (userId: string) => {
-<<<<<<< HEAD
     try {
       console.log('🔍 Fetching role for user:', userId);
       
@@ -93,7 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         console.log('🔄 Auth state changed:', _event, session?.user?.email);
-=======
     const [roleRes, memberRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
       supabase.from('members').select('id').eq('user_id', userId).maybeSingle(),
@@ -105,7 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -115,7 +112,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setMemberId(null);
         }
         setLoading(false);
-<<<<<<< HEAD
         console.log('✅ Auth state change complete, loading=false');
       }
     );
@@ -145,7 +141,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🧹 Cleaning up auth subscription');
       subscription.unsubscribe();
     };
-=======
       }
     );
 
@@ -159,7 +154,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -186,8 +180,3 @@ export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be inside AuthProvider');
   return ctx;
-<<<<<<< HEAD
-};
-=======
-};
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
