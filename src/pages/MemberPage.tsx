@@ -8,6 +8,7 @@ import WorkGrid from '@/components/WorkGrid';
 import PageTransition from '@/components/PageTransition';
 import { useEffect } from 'react';
 
+<<<<<<< HEAD
 // ============================================
 // NEW: Instagram Embed Component
 // ============================================
@@ -43,6 +44,8 @@ const InstagramEmbed = ({ url }: { url: string }) => {
   );
 };
 
+=======
+>>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
 const MemberPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: dbMember, isLoading } = useMember(slug || '');
@@ -91,6 +94,7 @@ const MemberPage = () => {
 
   const rolesDisplay = member.roles.join(' / ');
 
+<<<<<<< HEAD
   // ============================================
   // UPDATED: Build work items - handle both uploads AND Instagram embeds
   // ============================================
@@ -107,6 +111,12 @@ const MemberPage = () => {
         }
         
         // Otherwise, it's a regular uploaded file
+=======
+  // Build work items with public URLs
+  const works = useMock
+    ? mockWorks
+    : (worksRaw || []).map((w) => {
+>>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
         const { data } = supabase.storage.from('media').getPublicUrl(w.storage_path);
         return {
           id: w.id,
@@ -191,6 +201,7 @@ const MemberPage = () => {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* ============================================ */}
         {/* UPDATED: Portfolio - Now handles Instagram embeds */}
         {/* ============================================ */}
@@ -230,6 +241,13 @@ const MemberPage = () => {
               // If no Instagram posts, use the original WorkGrid component
               <WorkGrid works={works.filter((w: any) => w.type !== 'instagram_post')} />
             )}
+=======
+        {/* Portfolio */}
+        {works.length > 0 && (
+          <div className="px-6 md:px-10 pb-16">
+            <p className="text-muted-foreground text-xs tracking-widest uppercase mb-4">Portfolio</p>
+            <WorkGrid works={works} />
+>>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
           </div>
         )}
       </div>
@@ -237,4 +255,8 @@ const MemberPage = () => {
   );
 };
 
+<<<<<<< HEAD
 export default MemberPage;
+=======
+export default MemberPage;
+>>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
