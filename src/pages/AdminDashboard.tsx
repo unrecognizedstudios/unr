@@ -1,0 +1,913 @@
+import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useAdminQueries } from '@/hooks/useAdminQueries';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UserPlus } from 'lucide-react';
+import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon } from 'lucide-react';
+import PageTransition from '@/components/PageTransition';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+
+const AdminDashboard = () => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'approvals' | 'members' | 'roles' | 'analytics'>('approvals');
+  
+  // Use consolidated queries hook
+  const { pending, members, roles, analytics } = useAdminQueries();
+
+  // Edit member dialog state
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editInstagram, setEditInstagram] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editPortraitUrl, setEditPortraitUrl] = useState('');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // New member state
+  const [newRoleName, setNewRoleName] = useState('');
+
+  // Add member dialog state
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberSlug, setNewMemberSlug] = useState('');
+  const [newMemberTitle, setNewMemberTitle] = useState<'Founder' | 'Partner' | 'Member'>('Member');
+
+  // Open edit dialog
+  const openEditDialog = (member: any) => {
+    setEditingMember(member);
+    setEditName(member.name || '');
+    setEditBio(member.bio || '');
+    setEditInstagram(member.instagram_url || '');
+    setEditWebsite(member.website_url || '');
+    setEditSlug(member.slug || '');
+    setEditPortraitUrl(member.portrait_url || '');
+    setIsEditDialogOpen(true);
+  };
+
+  // Save member edits
+  const saveMemberEdits = async () => {
+    if (!editingMember) return;
+
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({
+          name: editName,
+          bio: editBio,
+          instagram_url: editInstagram,
+          website_url: editWebsite,
+          slug: editSlug,
+          portrait_url: editPortraitUrl,
+        })
+        .eq('id', editingMember.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Member updated successfully' });
+      setIsEditDialogOpen(false);
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Upload portrait image
+  const handlePortraitUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !editingMember) return;
+    const file = e.target.files[0];
+    
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `portraits/${editingMember.id}_${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(path, file);
+      
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(path);
+
+      setEditPortraitUrl(publicUrl);
+      toast({ title: 'Success', description: 'Portrait uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Delete member
+  const deleteMember = async (memberId: string, memberName: string) => {
+    try {
+      // Delete member_roles first (foreign key constraint)
+      await supabase.from('member_roles').delete().eq('member_id', memberId);
+      
+      // Delete member_works
+      await supabase.from('member_works').delete().eq('member_id', memberId);
+      
+      // Delete pending_changes
+      await supabase.from('pending_changes').delete().eq('member_id', memberId);
+      
+      // Delete analytics_events
+      await supabase.from('analytics_events').delete().eq('member_id', memberId);
+      
+      // Finally delete the member
+      const { error } = await supabase.from('members').delete().eq('id', memberId);
+      
+      if (error) throw error;
+
+      toast({ 
+        title: 'Deleted', 
+        description: `${memberName} has been removed` 
+      });
+      
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ 
+        title: 'Error', 
+        description: err.message, 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const approveChange = async (change: any) => {
+    const { change_type, change_data, member_id, id } = change;
+    const data = change_data as Record<string, any>;
+
+    try {
+      if (change_type === 'bio') {
+        // Now handles name, bio, AND links together
+        const updateData: any = {};
+        if (data.name) updateData.name = data.name;
+        if (data.bio) updateData.bio = data.bio;
+        if (data.instagram_url !== undefined) updateData.instagram_url = data.instagram_url;
+        if (data.website_url !== undefined) updateData.website_url = data.website_url;
+        
+        await supabase.from('members').update(updateData).eq('id', member_id);
+        
+      } else if (change_type === 'links') {
+        // Legacy support for old link changes
+        await supabase.from('members').update({
+          instagram_url: data.instagram_url,
+          website_url: data.website_url,
+        }).eq('id', member_id);
+        
+      } else if (change_type === 'roles') {
+        await supabase.from('member_roles').delete().eq('member_id', member_id);
+        const inserts = (data.role_ids as string[]).map(role_id => ({ member_id, role_id }));
+        if (inserts.length > 0) await supabase.from('member_roles').insert(inserts);
+        
+      } else if (change_type === 'media_add') {
+        const { count } = await supabase.from('member_works').select('id', { count: 'exact', head: true }).eq('member_id', member_id);
+        if ((count || 0) >= 6) {
+          toast({ title: 'Error', description: 'Member already has 6 works', variant: 'destructive' });
+          return;
+        }
+        
+        // Support both uploaded files AND Instagram URLs
+        const insertData: any = {
+          member_id,
+          type: data.type,
+          display_order: (count || 0),
+        };
+        
+        if (data.storage_path) {
+          // Regular file upload
+          insertData.storage_path = data.storage_path;
+        } else if (data.instagram_url) {
+          // Instagram post embed
+          insertData.instagram_url = data.instagram_url;
+        }
+        
+        await supabase.from('member_works').insert(insertData);
+        
+      } else if (change_type === 'media_remove') {
+        await supabase.from('member_works').delete().eq('id', data.work_id);
+        
+      } else if (change_type === 'portrait') {
+        await supabase.from('members').update({ portrait_url: data.portrait_url }).eq('id', member_id);
+      }
+
+      await supabase.from('pending_changes').update({ 
+        status: 'approved', 
+        reviewed_at: new Date().toISOString() 
+      }).eq('id', id);
+      
+      toast({ title: 'Approved' });
+      qc.invalidateQueries({ queryKey: ['admin-pending'] });
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const rejectChange = async (id: string) => {
+    await supabase.from('pending_changes').update({ 
+      status: 'rejected', 
+      reviewed_at: new Date().toISOString() 
+    }).eq('id', id);
+    
+    toast({ title: 'Rejected' });
+    qc.invalidateQueries({ queryKey: ['admin-pending'] });
+  };
+
+  const toggleLock = async (memberId: string, currentLock: boolean) => {
+    await supabase.from('members').update({ editing_locked: !currentLock }).eq('id', memberId);
+    qc.invalidateQueries({ queryKey: ['admin-members'] });
+    toast({ 
+      title: currentLock ? 'Unlocked' : 'Locked',
+      description: currentLock ? 'Member can now edit their profile' : 'Member editing disabled'
+    });
+  };
+
+  const updateTitle = async (memberId: string, title: string) => {
+    await supabase.from('members').update({ title: title as any }).eq('id', memberId);
+    qc.invalidateQueries({ queryKey: ['admin-members'] });
+    toast({ title: 'Title updated' });
+  };
+
+  const moveOrder = async (memberId: string, direction: 'up' | 'down') => {
+    if (!members) return;
+    const idx = members.findIndex(m => m.id === memberId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= members.length) return;
+    
+    await Promise.all([
+      supabase.from('members').update({ display_order: members[swapIdx].display_order }).eq('id', members[idx].id),
+      supabase.from('members').update({ display_order: members[idx].display_order }).eq('id', members[swapIdx].id),
+    ]);
+    qc.invalidateQueries({ queryKey: ['admin-members'] });
+  };
+
+  const addRole = async () => {
+    if (!newRoleName.trim()) return;
+    const { error } = await supabase.from('available_roles').insert({ name: newRoleName.trim() });
+    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    else {
+      toast({ title: 'Role added' });
+      setNewRoleName('');
+      qc.invalidateQueries({ queryKey: ['admin-roles'] });
+    }
+  };
+
+  const deleteRole = async (id: string) => {
+    await supabase.from('available_roles').delete().eq('id', id);
+    qc.invalidateQueries({ queryKey: ['admin-roles'] });
+    toast({ title: 'Role removed' });
+  };
+
+  // ============================================
+  // FIXED: Create Member - Works without admin API
+  // ============================================
+  const createMember = async () => {
+    // Validation
+    if (!newMemberEmail.trim() || !newMemberName.trim() || !newMemberSlug.trim()) {
+      toast({ 
+        title: 'Error', 
+        description: 'Please fill in all required fields', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    // Validate slug format
+    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    if (!slugRegex.test(newMemberSlug)) {
+      toast({ 
+        title: 'Error', 
+        description: 'Slug must be lowercase with hyphens only (e.g., john-doe)', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    try {
+      // Use RPC function to find user by email
+      const { data: userId, error: rpcError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: newMemberEmail });
+      
+      if (rpcError || !userId) {
+        toast({
+          title: 'User Not Found',
+          description: `No auth user found with email ${newMemberEmail}. Please invite them first through Supabase Dashboard → Authentication → Users.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Create member with found user_id
+      await createMemberRecord(userId);
+
+    } catch (err: any) {
+      console.error('Error creating member:', err);
+      toast({ 
+        title: 'Error', 
+        description: err.message || 'Failed to create member', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const createMemberRecord = async (userId: string) => {
+    // Check if member already exists
+    const { data: existing } = await supabase
+      .from('members')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (existing) {
+      toast({
+        title: 'Already Exists',
+        description: 'This user already has a member profile',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Create member record
+    const { error: memberError } = await supabase.from('members').insert({
+      user_id: userId,
+      name: newMemberName,
+      slug: newMemberSlug,
+      title: newMemberTitle,
+      display_order: (members?.length || 0) + 1
+    });
+
+    if (memberError) throw memberError;
+
+    // Add member role
+    await supabase.from('user_roles').insert({
+      user_id: userId,
+      role: 'member'
+    });
+
+    toast({ 
+      title: 'Success!', 
+      description: `Member ${newMemberName} created successfully` 
+    });
+    
+    // Reset form
+    setIsAddMemberOpen(false);
+    setNewMemberEmail('');
+    setNewMemberName('');
+    setNewMemberSlug('');
+    setNewMemberTitle('Member');
+    
+    // Refresh
+    qc.invalidateQueries({ queryKey: ['admin-members'] });
+  };
+
+  // Auto-generate slug from name
+  const handleNameChange = (name: string) => {
+    setNewMemberName(name);
+    // Auto-generate slug: lowercase, replace spaces with hyphens
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-'); // Remove duplicate hyphens
+    setNewMemberSlug(slug);
+  };
+
+  const tabs = [
+    { id: 'approvals' as const, label: 'Approvals', count: pending?.length },
+    { id: 'members' as const, label: 'Members' },
+    { id: 'roles' as const, label: 'Roles' },
+    { id: 'analytics' as const, label: 'Analytics' },
+  ];
+
+  return (
+    <PageTransition>
+      <div className="min-h-screen bg-background px-6 py-8 max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="font-heading text-foreground text-2xl tracking-wider">Admin Dashboard</h1>
+          <Button 
+            variant="ghost" 
+            onClick={async () => { 
+              await signOut(); 
+              navigate('/'); 
+            }} 
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut size={18} className="mr-2" />
+            Logout
+          </Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-8 border-b border-border">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`font-heading text-sm tracking-widest px-4 py-2 border-b-2 transition-colors ${
+                activeTab === t.id 
+                  ? 'border-primary text-foreground' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+              {t.count ? <span className="ml-1 text-primary">({t.count})</span> : null}
+            </button>
+          ))}
+        </div>
+
+        {/* Approvals Tab */}
+        {activeTab === 'approvals' && (
+          <div className="space-y-3">
+            {pending?.length === 0 && (
+              <div className="text-center py-12">
+                <Check className="mx-auto h-12 w-12 text-green-500 mb-3" />
+                <p className="text-muted-foreground text-sm">No pending changes</p>
+              </div>
+            )}
+            {pending?.map((pc: any) => (
+              <div key={pc.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <span className="text-foreground font-heading tracking-wider text-sm">
+                      {pc.members?.name || 'Unknown'}
+                    </span>
+                    <span className="text-muted-foreground text-xs ml-2 capitalize">
+                      {pc.change_type.replace('_', ' ')}
+                    </span>
+                    <span className="text-muted-foreground text-xs ml-2">
+                      • {new Date(pc.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => approveChange(pc)} 
+                      className="text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                      title="Approve"
+                    >
+                      <Check size={16} />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => rejectChange(pc.id)} 
+                      className="text-destructive hover:bg-destructive/10"
+                      title="Reject"
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                </div>
+                <div className="bg-muted/30 rounded p-3">
+                  <pre className="text-muted-foreground text-xs overflow-auto whitespace-pre-wrap">
+                    {JSON.stringify(pc.change_data, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Members Tab */}
+        {activeTab === 'members' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                {members?.length || 0} member{members?.length !== 1 ? 's' : ''}
+              </p>
+              
+              {/* ADD MEMBER BUTTON */}
+              <Button 
+                onClick={() => setIsAddMemberOpen(true)}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <UserPlus size={16} className="mr-2" />
+                Add Member
+              </Button>
+            </div>
+            
+            {members?.map((m, i) => (
+              <div key={m.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/30 transition-colors">
+                <div className="flex items-center gap-4">
+                  {/* Drag Handle */}
+                  <div className="flex flex-col gap-1">
+                    <button 
+                      onClick={() => moveOrder(m.id, 'up')} 
+                      disabled={i === 0} 
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Move up"
+                      title="Move up"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button 
+                      onClick={() => moveOrder(m.id, 'down')} 
+                      disabled={i === (members?.length || 0) - 1} 
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
+                      aria-label="Move down"
+                      title="Move down"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  </div>
+
+                  {/* Portrait */}
+                  {m.portrait_url && (
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                      <img 
+                        src={m.portrait_url} 
+                        alt={m.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  {!m.portrait_url && (
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <ImageIcon size={20} className="text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Member Info */}
+                  <div className="flex-1">
+                    <p className="text-foreground font-heading tracking-wider">{m.name}</p>
+                    <p className="text-muted-foreground text-xs">@{m.slug}</p>
+                  </div>
+
+                  {/* Title Select */}
+                  <Select defaultValue={m.title} onValueChange={(v) => updateTitle(m.id, v)}>
+                    <SelectTrigger className="w-32 bg-card border-border text-foreground text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Founder">Founder</SelectItem>
+                      <SelectItem value="Partner">Partner</SelectItem>
+                      <SelectItem value="Member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => navigate(`/member/${m.slug}`)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="View profile"
+                    >
+                      <Eye size={16} />
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => openEditDialog(m)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Edit member"
+                    >
+                      <Edit size={16} />
+                    </Button>
+
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => toggleLock(m.id, m.editing_locked)} 
+                      className={m.editing_locked ? 'text-destructive' : 'text-muted-foreground'}
+                      title={m.editing_locked ? "Unlock editing" : "Lock editing"}
+                    >
+                      {m.editing_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                    </Button>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10"
+                          title="Delete member"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {m.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this member and all their content (works, pending changes, analytics). This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMember(m.id, m.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Roles Tab */}
+        {activeTab === 'roles' && (
+          <div>
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="New role name (e.g., Designer, Developer)"
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addRole()}
+                className="bg-card border-border text-foreground placeholder:text-muted-foreground max-w-xs"
+              />
+              <Button 
+                onClick={addRole} 
+                size="sm" 
+                className="bg-primary text-primary-foreground font-heading tracking-widest"
+              >
+                <Plus size={14} className="mr-1" />
+                Add Role
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {roles?.length === 0 && (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No roles yet. Add roles that members can select (e.g., Designer, Developer, Writer).
+                </p>
+              )}
+              {roles?.map((r) => (
+                <div key={r.id} className="flex items-center justify-between bg-card border border-border rounded-lg p-3 hover:border-primary/30 transition-colors">
+                  <span className="text-foreground text-sm font-medium">{r.name}</span>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => deleteRole(r.id)} 
+                    className="text-destructive hover:bg-destructive/10"
+                    aria-label={`Delete ${r.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-card border border-border rounded-lg p-6">
+                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Views</p>
+                <p className="text-foreground font-heading text-4xl">{analytics?.totalViews || 0}</p>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-6">
+                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Clicks</p>
+                <p className="text-foreground font-heading text-4xl">{analytics?.totalClicks || 0}</p>
+              </div>
+            </div>
+            
+            <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Per Member Analytics</h3>
+            <div className="space-y-2">
+              {analytics?.perMember && Object.entries(analytics.perMember).map(([id, data]) => (
+                <div key={id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
+                  <span className="text-foreground font-medium">{data.name}</span>
+                  <div className="flex gap-6 text-muted-foreground text-sm">
+                    <span className="flex items-center gap-2">
+                      <Eye size={14} />
+                      {data.views} views
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-primary"></span>
+                      {data.clicks} clicks
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {analytics?.perMember && Object.keys(analytics.perMember).length === 0 && (
+                <p className="text-muted-foreground text-sm text-center py-8">No analytics data yet.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Member Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Member: {editingMember?.name}</DialogTitle>
+              <DialogDescription>
+                Make changes to this member's profile. Changes are saved immediately.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Portrait Upload */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Profile Portrait</label>
+                <div className="flex items-center gap-4">
+                  {editPortraitUrl && (
+                    <img 
+                      src={editPortraitUrl} 
+                      alt="Portrait preview" 
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  )}
+                  <label className="cursor-pointer">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                      <Upload size={16} />
+                      <span className="text-sm">Upload Portrait</span>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handlePortraitUpload}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Name</label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Member name"
+                  className="bg-card"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Slug (URL)</label>
+                <Input
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="member-slug"
+                  className="bg-card font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL: /member/{editSlug || 'slug'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Bio</label>
+                <Textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  placeholder="Member bio"
+                  rows={4}
+                  className="bg-card resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Instagram URL</label>
+                <Input
+                  value={editInstagram}
+                  onChange={(e) => setEditInstagram(e.target.value)}
+                  placeholder="https://instagram.com/username"
+                  className="bg-card"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Website URL</label>
+                <Input
+                  value={editWebsite}
+                  onChange={(e) => setEditWebsite(e.target.value)}
+                  placeholder="https://example.com"
+                  className="bg-card"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveMemberEdits} className="bg-primary">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Member Dialog - UPDATED */}
+        <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-foreground">Add New Member</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Create a member profile for an existing user
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Alert className="border-blue-500/50 bg-blue-500/10">
+              <AlertDescription className="text-sm">
+                <strong>First time?</strong> Go to Supabase Dashboard → Authentication → Users → "Invite User" 
+                to create the auth account. Then return here to create their member profile.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  User Email *
+                </label>
+                <Input
+                  type="email"
+                  placeholder="member@example.com"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  className="bg-background border-border text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Must match an existing user in Authentication
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Full Name *
+                </label>
+                <Input
+                  type="text"
+                  placeholder="John Doe"
+                  value={newMemberName}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  className="bg-background border-border text-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  URL Slug *
+                </label>
+                <Input
+                  type="text"
+                  placeholder="john-doe"
+                  value={newMemberSlug}
+                  onChange={(e) => setNewMemberSlug(e.target.value)}
+                  className="bg-background border-border text-foreground font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will be used in URL: /member/{newMemberSlug || 'slug'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Title
+                </label>
+                <Select value={newMemberTitle} onValueChange={(v: any) => setNewMemberTitle(v)}>
+                  <SelectTrigger className="bg-background border-border text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Founder">Founder</SelectItem>
+                    <SelectItem value="Partner">Partner</SelectItem>
+                    <SelectItem value="Member">Member</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddMemberOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={createMember} className="bg-primary">
+                Create Member Profile
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageTransition>
+  );
+};
+
+export default AdminDashboard;
