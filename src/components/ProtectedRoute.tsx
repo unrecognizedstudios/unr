@@ -10,3 +10,4 @@ export const ProtectedRoute = ({ children, requiredRole }: { children: ReactNode
   if (requiredRole === 'admin' && role !== 'admin') return <Navigate to="/dashboard" replace />;
   
   return <>{children}</>;
+};
