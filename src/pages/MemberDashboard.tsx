@@ -9,13 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-<<<<<<< HEAD
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogOut, Upload, Check, Clock, X, TrendingUp, MousePointerClick, Trash2, GripVertical, Image as ImageIcon, Link as LinkIcon, Instagram } from 'lucide-react';
-=======
-import { LogOut, Upload, Check, Clock, X, TrendingUp, MousePointerClick } from 'lucide-react';
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -26,10 +22,6 @@ const MemberDashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-<<<<<<< HEAD
-=======
-  // Use consolidated queries hook
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   const {
     member,
     availableRoles,
@@ -40,17 +32,13 @@ const MemberDashboard = () => {
     isLoading: memberLoading,
   } = useMemberDashboard(memberId);
 
-<<<<<<< HEAD
   // Profile edit state
   const [name, setName] = useState('');
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   const [bio, setBio] = useState('');
   const [instagram, setInstagram] = useState('');
   const [website, setWebsite] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
-<<<<<<< HEAD
   // Portfolio management state
   const [isAddWorkOpen, setIsAddWorkOpen] = useState(false);
   const [workUploadType, setWorkUploadType] = useState<'upload' | 'instagram'>('upload');
@@ -60,10 +48,6 @@ const MemberDashboard = () => {
   useEffect(() => {
     if (member) {
       setName(member.name || '');
-=======
-  useEffect(() => {
-    if (member) {
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       setBio(member.bio || '');
       setInstagram(member.instagram_url || '');
       setWebsite(member.website_url || '');
@@ -108,7 +92,6 @@ const MemberDashboard = () => {
     }
   };
 
-<<<<<<< HEAD
   // Save profile changes (name, bio, links)
   const handleSaveProfile = () => {
     if (!name.trim()) {
@@ -126,32 +109,13 @@ const MemberDashboard = () => {
       instagram_url: instagram, 
       website_url: website 
     });
-=======
-  const handleSaveBio = () => {
-    if (!bio.trim()) {
-      toast({ 
-        title: 'Error', 
-        description: 'Bio cannot be empty', 
-        variant: 'destructive' 
-      });
-      return;
-    }
-    submitChange('bio', { bio });
-  };
-
-  const handleSaveLinks = () => {
-    submitChange('links', { instagram_url: instagram, website_url: website });
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   };
 
   const handleSaveRoles = () => {
     submitChange('roles', { role_ids: selectedRoles });
   };
 
-<<<<<<< HEAD
   // File upload for portfolio
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !memberId) return;
     const file = e.target.files[0];
@@ -160,26 +124,16 @@ const MemberDashboard = () => {
     if (currentCount >= 6) {
       toast({ 
         title: 'Limit Reached', 
-<<<<<<< HEAD
         description: 'You can only have up to 6 portfolio items.', 
-=======
-        description: 'You can only upload up to 6 works.', 
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
         variant: 'destructive' 
       });
       return;
     }
 
-<<<<<<< HEAD
     setUploadingFile(true);
     try {
       const ext = file.name.split('.').pop();
       const path = `works/${memberId}/${Date.now()}.${ext}`;
-=======
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `${memberId}/${Date.now()}.${ext}`;
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       
       const { error: uploadError } = await supabase.storage.from('media').upload(path, file);
       
@@ -187,7 +141,6 @@ const MemberDashboard = () => {
 
       const type = file.type.startsWith('video') ? 'video' : 'image';
       await submitChange('media_add', { storage_path: path, type });
-<<<<<<< HEAD
       
       setIsAddWorkOpen(false);
       toast({ title: 'Uploaded!', description: 'Pending admin approval' });
@@ -239,15 +192,6 @@ const MemberDashboard = () => {
   // Delete portfolio item
   const handleDeleteWork = (workId: string) => {
     submitChange('media_remove', { work_id: workId });
-=======
-    } catch (err: any) {
-      toast({ 
-        title: 'Upload Failed', 
-        description: err.message, 
-        variant: 'destructive' 
-      });
-    }
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   };
 
   const handleLogout = async () => {
@@ -268,34 +212,19 @@ const MemberDashboard = () => {
       case 'approved':
         return (
           <span className="flex items-center gap-1 text-xs text-green-500">
-<<<<<<< HEAD
             <Check size={12} /> Approved
-=======
-            <Check size={12} />
-            Approved
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
           </span>
         );
       case 'rejected':
         return (
           <span className="flex items-center gap-1 text-xs text-destructive">
-<<<<<<< HEAD
             <X size={12} /> Rejected
-=======
-            <X size={12} />
-            Rejected
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
           </span>
         );
       default:
         return (
           <span className="flex items-center gap-1 text-xs text-yellow-500">
-<<<<<<< HEAD
             <Clock size={12} /> Pending
-=======
-            <Clock size={12} />
-            Pending
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
           </span>
         );
     }
@@ -311,11 +240,7 @@ const MemberDashboard = () => {
               Welcome, {member?.name}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-<<<<<<< HEAD
               Manage your profile and portfolio
-=======
-              Manage your profile and view analytics
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
             </p>
           </div>
           <Button 
@@ -330,20 +255,13 @@ const MemberDashboard = () => {
 
         {/* Locked Warning */}
         {isLocked && (
-<<<<<<< HEAD
           <Alert className="mb-6 border-destructive/50 bg-destructive/10">
             <AlertDescription className="text-destructive">
               Your profile is currently locked by an admin. You cannot make changes.
-=======
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>
-              Your editing access has been temporarily disabled by an administrator. Please contact an admin for more information.
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
             </AlertDescription>
           </Alert>
         )}
 
-<<<<<<< HEAD
         {/* Main Content */}
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 bg-muted">
@@ -648,260 +566,9 @@ const MemberDashboard = () => {
             </Tabs>
           </DialogContent>
         </Dialog>
-=======
-        {/* Analytics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Profile Views
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">
-                {analytics?.views || 0}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total profile page visits
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Link Clicks
-              </CardTitle>
-              <MousePointerClick className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">
-                {analytics?.clicks || 0}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Instagram & website clicks
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Edit Bio Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Biography</CardTitle>
-            <CardDescription>
-              Update your bio to tell visitors about yourself
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              disabled={isLocked}
-              placeholder="Write something about yourself..."
-              className="bg-card border-border text-foreground min-h-[100px] resize-none"
-              maxLength={500}
-            />
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {bio.length}/500 characters
-              </p>
-              <Button 
-                onClick={handleSaveBio} 
-                disabled={isLocked || !bio.trim()} 
-                size="sm" 
-                className="bg-primary text-primary-foreground"
-              >
-                Submit Bio Change
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Edit Links Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Social Links</CardTitle>
-            <CardDescription>
-              Add your Instagram and website links
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Instagram URL</label>
-              <Input
-                placeholder="https://instagram.com/yourusername"
-                value={instagram}
-                onChange={(e) => setInstagram(e.target.value)}
-                disabled={isLocked}
-                className="bg-card border-border text-foreground"
-                type="url"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Website URL</label>
-              <Input
-                placeholder="https://yourwebsite.com"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                disabled={isLocked}
-                className="bg-card border-border text-foreground"
-                type="url"
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveLinks} 
-                disabled={isLocked} 
-                size="sm" 
-                className="bg-primary text-primary-foreground"
-              >
-                Submit Link Changes
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Edit Roles Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Your Roles</CardTitle>
-            <CardDescription>
-              Select the roles that describe what you do
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {availableRoles && availableRoles.length > 0 ? (
-              <div className="space-y-3">
-                {availableRoles.map((r) => (
-                  <label 
-                    key={r.id} 
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedRoles.includes(r.id)}
-                      onCheckedChange={(checked) => {
-                        setSelectedRoles((prev) =>
-                          checked ? [...prev, r.id] : prev.filter((id) => id !== r.id)
-                        );
-                      }}
-                      disabled={isLocked}
-                    />
-                    <span className="text-foreground font-medium">{r.name}</span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm text-center py-4">
-                No roles available yet. Contact an admin to add roles.
-              </p>
-            )}
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveRoles} 
-                disabled={isLocked || !availableRoles?.length} 
-                size="sm" 
-                className="bg-primary text-primary-foreground"
-              >
-                Submit Role Changes
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Media Upload Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Portfolio Works ({works?.length || 0}/6)</CardTitle>
-            <CardDescription>
-              Upload images or videos to showcase your work (max 6)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isLocked && (works?.length || 0) < 6 ? (
-              <label className="block cursor-pointer group">
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors group-hover:bg-muted/30">
-                  <Upload className="mx-auto h-12 w-12 text-muted-foreground group-hover:text-primary transition-colors mb-3" />
-                  <p className="text-foreground font-medium mb-1">
-                    Click to upload image or video
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    Supported formats: JPG, PNG, GIF, MP4, MOV
-                  </p>
-                </div>
-                <input 
-                  type="file" 
-                  accept="image/*,video/*" 
-                  className="hidden" 
-                  onChange={handleMediaUpload} 
-                />
-              </label>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                {isLocked ? (
-                  <p>Upload disabled - editing is locked</p>
-                ) : (
-                  <p>Maximum of 6 works reached</p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Submissions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Submissions</CardTitle>
-            <CardDescription>
-              Track the status of your change requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pendingChanges && pendingChanges.length > 0 ? (
-              <div className="space-y-3">
-                {pendingChanges.map((pc) => (
-                  <div 
-                    key={pc.id} 
-                    className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-primary/30 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <p className="text-foreground font-medium capitalize">
-                        {pc.change_type.replace('_', ' ')}
-                      </p>
-                      <p className="text-muted-foreground text-xs mt-1">
-                        Submitted {new Date(pc.created_at).toLocaleDateString()} at{' '}
-                        {new Date(pc.created_at).toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </p>
-                    </div>
-                    <div>
-                      {getStatusBadge(pc.status)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-                <p className="text-muted-foreground">No submissions yet</p>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Changes you submit will appear here for admin review
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       </div>
     </PageTransition>
   );
 };
 
-<<<<<<< HEAD
 export default MemberDashboard;
-=======
-export default MemberDashboard;
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
