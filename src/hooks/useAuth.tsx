@@ -92,17 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         console.log('🔄 Auth state changed:', _event, session?.user?.email);
-    const [roleRes, memberRes] = await Promise.all([
-      supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
-      supabase.from('members').select('id').eq('user_id', userId).maybeSingle(),
-    ]);
-    setRole((roleRes.data?.role as AppRole) || null);
-    setMemberId(memberRes.data?.id || null);
-  };
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -141,19 +130,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('🧹 Cleaning up auth subscription');
       subscription.unsubscribe();
     };
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRoleAndMember(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -180,3 +156,4 @@ export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be inside AuthProvider');
   return ctx;
+};
