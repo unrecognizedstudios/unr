@@ -9,19 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-<<<<<<< HEAD
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus } from 'lucide-react';
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
 import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-<<<<<<< HEAD
 
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
 const AdminDashboard = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -45,7 +39,6 @@ const AdminDashboard = () => {
   // New member state
   const [newRoleName, setNewRoleName] = useState('');
 
-<<<<<<< HEAD
   // Add member dialog state
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
@@ -53,8 +46,6 @@ const AdminDashboard = () => {
   const [newMemberSlug, setNewMemberSlug] = useState('');
   const [newMemberTitle, setNewMemberTitle] = useState<'Founder' | 'Partner' | 'Member'>('Member');
 
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   // Open edit dialog
   const openEditDialog = (member: any) => {
     setEditingMember(member);
@@ -161,7 +152,6 @@ const AdminDashboard = () => {
 
     try {
       if (change_type === 'bio') {
-<<<<<<< HEAD
         // Now handles name, bio, AND links together
         const updateData: any = {};
         if (data.name) updateData.name = data.name;
@@ -173,33 +163,22 @@ const AdminDashboard = () => {
         
       } else if (change_type === 'links') {
         // Legacy support for old link changes
-=======
-        await supabase.from('members').update({ bio: data.bio }).eq('id', member_id);
-      } else if (change_type === 'links') {
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
         await supabase.from('members').update({
           instagram_url: data.instagram_url,
           website_url: data.website_url,
         }).eq('id', member_id);
-<<<<<<< HEAD
         
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       } else if (change_type === 'roles') {
         await supabase.from('member_roles').delete().eq('member_id', member_id);
         const inserts = (data.role_ids as string[]).map(role_id => ({ member_id, role_id }));
         if (inserts.length > 0) await supabase.from('member_roles').insert(inserts);
-<<<<<<< HEAD
         
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       } else if (change_type === 'media_add') {
         const { count } = await supabase.from('member_works').select('id', { count: 'exact', head: true }).eq('member_id', member_id);
         if ((count || 0) >= 6) {
           toast({ title: 'Error', description: 'Member already has 6 works', variant: 'destructive' });
           return;
         }
-<<<<<<< HEAD
         
         // Support both uploaded files AND Instagram URLs
         const insertData: any = {
@@ -221,16 +200,6 @@ const AdminDashboard = () => {
       } else if (change_type === 'media_remove') {
         await supabase.from('member_works').delete().eq('id', data.work_id);
         
-=======
-        await supabase.from('member_works').insert({
-          member_id,
-          type: data.type,
-          storage_path: data.storage_path,
-          display_order: (count || 0),
-        });
-      } else if (change_type === 'media_remove') {
-        await supabase.from('member_works').delete().eq('id', data.work_id);
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       } else if (change_type === 'portrait') {
         await supabase.from('members').update({ portrait_url: data.portrait_url }).eq('id', member_id);
       }
@@ -303,7 +272,6 @@ const AdminDashboard = () => {
     toast({ title: 'Role removed' });
   };
 
-<<<<<<< HEAD
   // ============================================
   // FIXED: Create Member - Works without admin API
   // ============================================
@@ -419,8 +387,6 @@ const AdminDashboard = () => {
     setNewMemberSlug(slug);
   };
 
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
   const tabs = [
     { id: 'approvals' as const, label: 'Approvals', count: pending?.length },
     { id: 'members' as const, label: 'Members' },
@@ -525,7 +491,6 @@ const AdminDashboard = () => {
               <p className="text-sm text-muted-foreground">
                 {members?.length || 0} member{members?.length !== 1 ? 's' : ''}
               </p>
-<<<<<<< HEAD
               
               {/* ADD MEMBER BUTTON */}
               <Button 
@@ -535,8 +500,6 @@ const AdminDashboard = () => {
                 <UserPlus size={16} className="mr-2" />
                 Add Member
               </Button>
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
             </div>
             
             {members?.map((m, i) => (
@@ -851,7 +814,6 @@ const AdminDashboard = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-<<<<<<< HEAD
 
         {/* Add Member Dialog - UPDATED */}
         <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
@@ -943,15 +905,9 @@ const AdminDashboard = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-=======
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
       </div>
     </PageTransition>
   );
 };
 
-<<<<<<< HEAD
 export default AdminDashboard;
-=======
-export default AdminDashboard;
->>>>>>> 56ba229ab5dc27944df95645eb897d9abe944e3e
