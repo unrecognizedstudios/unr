@@ -90,20 +90,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('🚀 useAuth: Setting up auth listener');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log('🔄 Auth state changed:', _event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchRoleAndMember(session.user.id);
-        } else {
-          setRole(null);
-          setMemberId(null);
-        }
+  (_event, session) => {
+    console.log('🔄 Auth state changed:', _event, session?.user?.email);
+    setSession(session);
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      setTimeout(async () => {
+        await fetchRoleAndMember(session.user.id);
         setLoading(false);
         console.log('✅ Auth state change complete, loading=false');
-      }
-    );
+      }, 0);
+    } else {
+      setRole(null);
+      setMemberId(null);
+      setLoading(false);
+      console.log('✅ Auth state change complete (signed out), loading=false');
+    }
+  }
+);
 
     // Initial session check
     (async () => {
