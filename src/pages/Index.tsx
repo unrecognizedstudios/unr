@@ -49,6 +49,30 @@ const Index = () => {
             <MemberGrid members={members} />
           ) : null}
         </main>
+        <footer className="mt-20 mb-12 flex flex-col items-center justify-center gap-6 px-4">
+          <div className="w-full max-w-xs border-t border-border opacity-20" />
+          <h2 className="font-heading text-foreground text-2xl tracking-widest uppercase">
+            Contact Us
+          </h2>
+          <div className="flex flex-col items-center gap-3 text-muted-foreground text-sm tracking-wide">
+            
+              href="mailto:unrecognized.s@hotmail.com"
+              className="hover:text-foreground transition-colors duration-200"
+            >
+              unrecognized.s@hotmail.com
+            </a>
+            
+              href="https://www.instagram.com/unrecognizedstudio?igsh=bnZnOHQwdWltb3Rv"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors duration-200"
+            >
+              @unrecognizedstudio
+            </a>
+          </div>
+        </footer>
+      </div>
+    </PageTransition>
       </div>
     </PageTransition>
   );
