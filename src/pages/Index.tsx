@@ -54,18 +54,10 @@ const Index = () => {
             Contact Us
           </h2>
           <div className="flex flex-col items-center gap-3 text-muted-foreground text-sm tracking-wide">
-            
-              href="mailto:unrecognized.s@hotmail.com"
-              className="hover:text-foreground transition-colors duration-200"
-            >
+            <a href="mailto:unrecognized.s@hotmail.com" className="hover:text-foreground transition-colors duration-200">
               unrecognized.s@hotmail.com
             </a>
-            
-              href="https://www.instagram.com/unrecognizedstudio?igsh=bnZnOHQwdWltb3Rv"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors duration-200"
-            >
+            <a href="https://www.instagram.com/unrecognizedstudio?igsh=bnZnOHQwdWltb3Rv" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors duration-200">
               @unrecognizedstudio
             </a>
           </div>
