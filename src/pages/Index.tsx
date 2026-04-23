@@ -6,7 +6,6 @@ import PageTransition from '@/components/PageTransition';
 const Index = () => {
   const { data: dbMembers, isLoading } = useMembers();
 
-  // Fall back to mock data if database is empty
   const useMock = !isLoading && (!dbMembers || dbMembers.length === 0);
   const mockConverted: MemberWithRoles[] = getMembersByHierarchy(mockMembers).map((m) => ({
     id: m.id,
@@ -30,7 +29,6 @@ const Index = () => {
       <div className="min-h-screen bg-background flex flex-col">
         <header className="flex flex-col items-center justify-center min-h-[90vh] px-4">
           <div className="text-center">
-            <span className="text-muted-foreground text-2xl mb-6 block opacity-40">🍁</span>
             <h1 className="font-heading text-foreground text-[15vw] md:text-[12vw] lg:text-[10vw] leading-[0.85] tracking-wider">
               Unrecognized
             </h1>
