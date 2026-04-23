@@ -49,6 +49,7 @@ const Index = () => {
             <MemberGrid members={members} />
           ) : null}
         </main>
+
         <footer className="mt-20 mb-12 flex flex-col items-center justify-center gap-6 px-4">
           <div className="w-full max-w-xs border-t border-border opacity-20" />
           <h2 className="font-heading text-foreground text-2xl tracking-widest uppercase">
@@ -71,8 +72,6 @@ const Index = () => {
             </a>
           </div>
         </footer>
-      </div>
-    </PageTransition>
       </div>
     </PageTransition>
   );
