@@ -533,7 +533,7 @@ const MemberDashboard = () => {
                     className="bg-background border-border"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Upload an image or video (max 10MB)
+                    Upload an image or video (max 50MB)
                   </p>
                 </div>
               </TabsContent>
