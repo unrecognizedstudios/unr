@@ -1,38 +1,50 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MemberWork } from '@/lib/mockData';
+import Lightbox from '@/components/Lightbox';
 
 interface WorkGridProps {
   works: MemberWork[];
 }
 
 const WorkGrid = ({ works }: WorkGridProps) => {
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
-      {works.slice(0, 6).map((work, i) => (
-        <motion.div
-          key={work.id}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: i * 0.1 }}
-          className="aspect-[4/3] overflow-hidden"
-        >
-          {work.type === 'video' ? (
-            <VideoItem work={work} />
-          ) : (
-            <ImageItem work={work} />
-          )}
-        </motion.div>
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
+        {works.slice(0, 6).map((work, i) => (
+          <motion.div
+            key={work.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: i * 0.1 }}
+            className="aspect-[4/3] overflow-hidden"
+          >
+            {work.type === 'video' ? (
+              <VideoItem work={work} />
+            ) : (
+              <ImageItem work={work} onOpen={() => setLightboxSrc(work.src)} />
+            )}
+          </motion.div>
+        ))}
+      </div>
+
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
+    </>
   );
 };
 
-const ImageItem = ({ work }: { work: MemberWork }) => {
+const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) => {
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <div className="relative w-full h-full">
+    <div
+      className="relative w-full h-full cursor-zoom-in"
+      onClick={onOpen}
+    >
       <img
         src={work.src}
         alt=""
