@@ -71,6 +71,8 @@ const MemberPage = () => {
     ? mockMember!.works.map((w) => ({ id: w.id, type: w.type, src: w.src, thumbnail: w.thumbnail }))
     : [];
 
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   // Track page view
   useEffect(() => {
     if (dbMember?.id) {
@@ -118,8 +120,6 @@ const MemberPage = () => {
             : undefined,
         };
       });
-
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const handleLinkClick = (linkType: string) => {
     if (dbMember?.id) {
