@@ -82,20 +82,48 @@ export const useMemberDashboard = (memberId: string | null) => {
   const analyticsQuery = useQuery({
     queryKey: ['member-analytics', memberId],
     queryFn: async () => {
-      if (!memberId) return { views: 0, clicks: 0 };
-      const [views, clicks] = await Promise.all([
+      if (!memberId) return {
+        last30: { views: 0, clicks: 0 },
+        last365: { views: 0, clicks: 0 },
+      };
+
+      const now = new Date();
+      const date30 = new Date(now);
+      date30.setDate(date30.getDate() - 30);
+      const date365 = new Date(now);
+      date365.setFullYear(date365.getFullYear() - 1);
+
+      const [views30, clicks30, views365, clicks365] = await Promise.all([
         supabase
           .from('analytics_events')
           .select('id', { count: 'exact', head: true })
           .eq('member_id', memberId)
-          .eq('event_type', 'page_view'),
+          .eq('event_type', 'page_view')
+          .gte('created_at', date30.toISOString()),
         supabase
           .from('analytics_events')
           .select('id', { count: 'exact', head: true })
           .eq('member_id', memberId)
-          .eq('event_type', 'link_click'),
+          .eq('event_type', 'link_click')
+          .gte('created_at', date30.toISOString()),
+        supabase
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('member_id', memberId)
+          .eq('event_type', 'page_view')
+          .gte('created_at', date365.toISOString()),
+        supabase
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('member_id', memberId)
+          .eq('event_type', 'link_click')
+          .gte('created_at', date365.toISOString()),
       ]);
-      return { views: views.count || 0, clicks: clicks.count || 0 };
+
+      return {
+        last30: { views: views30.count || 0, clicks: clicks30.count || 0 },
+        last365: { views: views365.count || 0, clicks: clicks365.count || 0 },
+      };
     },
     enabled: !!memberId,
   });
