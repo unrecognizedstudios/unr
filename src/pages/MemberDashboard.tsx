@@ -117,21 +117,18 @@ const MemberDashboard = () => {
 
   // File upload for portfolio
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  if (!e.target.files?.[0] || !memberId) return;
-  const file = e.target.files[0];
-
-  // ✅ Add this block:
-  const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-  if (file.size > MAX_SIZE) {
-    toast({
-      title: 'File Too Large',
-      description: 'Please upload a file under 50MB.',
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  // ... rest of the function
+    if (!e.target.files?.[0] || !memberId) return;
+    const file = e.target.files[0];
+    const currentCount = works?.length || 0;
+    
+    if (currentCount >= 6) {
+      toast({ 
+        title: 'Limit Reached', 
+        description: 'You can only have up to 6 portfolio items.', 
+        variant: 'destructive' 
+      });
+      return;
+    }
 
     setUploadingFile(true);
     try {
@@ -480,33 +477,65 @@ const MemberDashboard = () => {
 
           {/* ANALYTICS TAB */}
           <TabsContent value="analytics">
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-heading text-foreground">Your Analytics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <TrendingUp size={16} />
-                      <span className="text-sm">Profile Views</span>
+            <div className="flex flex-col gap-4">
+              {/* Last 30 Days */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="font-heading text-foreground text-base tracking-wider">Last 30 Days</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <TrendingUp size={16} />
+                        <span className="text-sm">Profile Views</span>
+                      </div>
+                      <p className="text-3xl font-bold text-foreground">
+                        {analytics?.last30?.views || 0}
+                      </p>
                     </div>
-                    <p className="text-3xl font-bold text-foreground">
-                      {analytics?.views || 0}
-                    </p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <MousePointerClick size={16} />
-                      <span className="text-sm">Link Clicks</span>
+                    <div className="bg-muted rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <MousePointerClick size={16} />
+                        <span className="text-sm">Link Clicks</span>
+                      </div>
+                      <p className="text-3xl font-bold text-foreground">
+                        {analytics?.last30?.clicks || 0}
+                      </p>
                     </div>
-                    <p className="text-3xl font-bold text-foreground">
-                      {analytics?.clicks || 0}
-                    </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Last 365 Days */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="font-heading text-foreground text-base tracking-wider">Last 365 Days</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <TrendingUp size={16} />
+                        <span className="text-sm">Profile Views</span>
+                      </div>
+                      <p className="text-3xl font-bold text-foreground">
+                        {analytics?.last365?.views || 0}
+                      </p>
+                    </div>
+                    <div className="bg-muted rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <MousePointerClick size={16} />
+                        <span className="text-sm">Link Clicks</span>
+                      </div>
+                      <p className="text-3xl font-bold text-foreground">
+                        {analytics?.last365?.clicks || 0}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -536,7 +565,7 @@ const MemberDashboard = () => {
                     className="bg-background border-border"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Upload an image or video (max 50MB)
+                    Upload an image or video (max 10MB)
                   </p>
                 </div>
               </TabsContent>
