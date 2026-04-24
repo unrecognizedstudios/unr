@@ -6,7 +6,8 @@ import { trackEvent } from '@/lib/analytics';
 import { supabase } from '@/integrations/supabase/client';
 import WorkGrid from '@/components/WorkGrid';
 import PageTransition from '@/components/PageTransition';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Lightbox from '@/components/Lightbox';
 
 // ============================================
 // NEW: Instagram Embed Component
@@ -118,6 +119,8 @@ const MemberPage = () => {
         };
       });
 
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   const handleLinkClick = (linkType: string) => {
     if (dbMember?.id) {
       trackEvent(dbMember.id, 'link_click', { link_type: linkType });
@@ -135,7 +138,7 @@ const MemberPage = () => {
 
         {/* Portrait Header */}
         {member.portrait_url ? (
-          <div className="relative w-full aspect-[3/4] max-h-[70vh] overflow-hidden">
+          <div className="relative w-full aspect-[3/4] max-h-[70vh] overflow-hidden cursor-zoom-in" onClick={() => setLightboxSrc(member.portrait_url!)}>
             <img src={member.portrait_url} alt={member.name} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
@@ -218,7 +221,8 @@ const MemberPage = () => {
                           <img 
                             src={work.src} 
                             alt="Portfolio item" 
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-zoom-in"
+                            onClick={() => setLightboxSrc(work.src)}
                           />
                         )}
                       </div>
@@ -233,6 +237,10 @@ const MemberPage = () => {
           </div>
         )}
       </div>
+
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
     </PageTransition>
   );
 };
