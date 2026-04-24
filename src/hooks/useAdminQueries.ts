@@ -48,27 +48,42 @@ export const useAdminQueries = () => {
   const analyticsQuery = useQuery({
     queryKey: ['admin-analytics'],
     queryFn: async () => {
-      const { data: events } = await supabase
-        .from('analytics_events')
-        .select('event_type, member_id, members(name)')
-        .order('created_at', { ascending: false })
-        .limit(500);
-      
-      const totalViews = events?.filter(e => e.event_type === 'page_view').length || 0;
-      const totalClicks = events?.filter(e => e.event_type === 'link_click').length || 0;
-      
-      // Per member breakdown
-      const perMember: Record<string, { name: string; views: number; clicks: number }> = {};
-      events?.forEach((e: any) => {
-        if (!e.member_id) return;
-        if (!perMember[e.member_id]) {
-          perMember[e.member_id] = { name: e.members?.name || 'Unknown', views: 0, clicks: 0 };
-        }
-        if (e.event_type === 'page_view') perMember[e.member_id].views++;
-        else perMember[e.member_id].clicks++;
-      });
+      const now = new Date();
+      const date30 = new Date(now);
+      date30.setDate(date30.getDate() - 30);
+      const date365 = new Date(now);
+      date365.setFullYear(date365.getFullYear() - 1);
 
-      return { totalViews, totalClicks, perMember };
+      const [events30, events365] = await Promise.all([
+        supabase
+          .from('analytics_events')
+          .select('event_type, member_id, members(name)')
+          .gte('created_at', date30.toISOString()),
+        supabase
+          .from('analytics_events')
+          .select('event_type, member_id, members(name)')
+          .gte('created_at', date365.toISOString()),
+      ]);
+
+      const buildStats = (events: any[]) => {
+        const totalViews = events.filter(e => e.event_type === 'page_view').length;
+        const totalClicks = events.filter(e => e.event_type === 'link_click').length;
+        const perMember: Record<string, { name: string; views: number; clicks: number }> = {};
+        events.forEach((e: any) => {
+          if (!e.member_id) return;
+          if (!perMember[e.member_id]) {
+            perMember[e.member_id] = { name: e.members?.name || 'Unknown', views: 0, clicks: 0 };
+          }
+          if (e.event_type === 'page_view') perMember[e.member_id].views++;
+          else perMember[e.member_id].clicks++;
+        });
+        return { totalViews, totalClicks, perMember };
+      };
+
+      return {
+        last30: buildStats(events30.data || []),
+        last365: buildStats(events365.data || []),
+      };
     },
   });
 
