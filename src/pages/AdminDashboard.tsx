@@ -676,39 +676,78 @@ const AdminDashboard = () => {
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Views</p>
-                <p className="text-foreground font-heading text-4xl">{analytics?.totalViews || 0}</p>
-              </div>
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Clicks</p>
-                <p className="text-foreground font-heading text-4xl">{analytics?.totalClicks || 0}</p>
-              </div>
-            </div>
-            
-            <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Per Member Analytics</h3>
-            <div className="space-y-2">
-              {analytics?.perMember && Object.entries(analytics.perMember).map(([id, data]) => (
-                <div key={id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
-                  <span className="text-foreground font-medium">{data.name}</span>
-                  <div className="flex gap-6 text-muted-foreground text-sm">
-                    <span className="flex items-center gap-2">
-                      <Eye size={14} />
-                      {data.views} views
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-primary"></span>
-                      {data.clicks} clicks
-                    </span>
-                  </div>
+          <div className="flex flex-col gap-8">
+
+            {/* Last 30 Days */}
+            <div>
+              <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Last 30 Days</h3>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Views</p>
+                  <p className="text-foreground font-heading text-4xl">{analytics?.last30?.totalViews || 0}</p>
                 </div>
-              ))}
-              {analytics?.perMember && Object.keys(analytics.perMember).length === 0 && (
-                <p className="text-muted-foreground text-sm text-center py-8">No analytics data yet.</p>
-              )}
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Clicks</p>
+                  <p className="text-foreground font-heading text-4xl">{analytics?.last30?.totalClicks || 0}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {analytics?.last30?.perMember && Object.entries(analytics.last30.perMember).map(([id, data]) => (
+                  <div key={id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
+                    <span className="text-foreground font-medium">{data.name}</span>
+                    <div className="flex gap-6 text-muted-foreground text-sm">
+                      <span className="flex items-center gap-2">
+                        <Eye size={14} />
+                        {data.views} views
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-primary"></span>
+                        {data.clicks} clicks
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {analytics?.last30?.perMember && Object.keys(analytics.last30.perMember).length === 0 && (
+                  <p className="text-muted-foreground text-sm text-center py-4">No data in the last 30 days.</p>
+                )}
+              </div>
             </div>
+
+            {/* Last 365 Days */}
+            <div>
+              <h3 className="font-heading text-foreground text-lg tracking-wider mb-3">Last 365 Days</h3>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Views</p>
+                  <p className="text-foreground font-heading text-4xl">{analytics?.last365?.totalViews || 0}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-6">
+                  <p className="text-muted-foreground text-xs uppercase tracking-widest mb-2">Total Clicks</p>
+                  <p className="text-foreground font-heading text-4xl">{analytics?.last365?.totalClicks || 0}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {analytics?.last365?.perMember && Object.entries(analytics.last365.perMember).map(([id, data]) => (
+                  <div key={id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
+                    <span className="text-foreground font-medium">{data.name}</span>
+                    <div className="flex gap-6 text-muted-foreground text-sm">
+                      <span className="flex items-center gap-2">
+                        <Eye size={14} />
+                        {data.views} views
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-primary"></span>
+                        {data.clicks} clicks
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {analytics?.last365?.perMember && Object.keys(analytics.last365.perMember).length === 0 && (
+                  <p className="text-muted-foreground text-sm text-center py-4">No data in the last 365 days.</p>
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
