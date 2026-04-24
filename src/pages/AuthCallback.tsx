@@ -16,31 +16,46 @@ const AuthCallback = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Supabase puts the token in the URL hash (#access_token=...) or as query params
-    // onAuthStateChange will fire with event SIGNED_IN or PASSWORD_RECOVERY
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        // User came from an invite or password reset link — show password form
-        setMode('set_password');
-      }
-    });
+    const params = new URLSearchParams(window.location.search);
+    const tokenHash = params.get('token_hash');
+    const type = params.get('type'); // 'recovery' or 'invite'
 
-    // Also handle the case where the session is already set from the URL hash
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setMode('set_password');
-      } else {
-        // Give onAuthStateChange a moment to fire
-        setTimeout(() => {
-          setMode((current) => {
-            if (current === 'loading') return 'error';
-            return current;
-          });
-        }, 3000);
-      }
-    });
+    if (tokenHash && (type === 'recovery' || type === 'invite')) {
+      // Exchange the token_hash for a live session.
+      // This is required when using the new {{ .TokenHash }} email templates.
+      supabase.auth
+        .verifyOtp({
+          token_hash: tokenHash,
+          type: type === 'invite' ? 'invite' : 'recovery',
+        })
+        .then(({ error: otpError }) => {
+          if (otpError) {
+            console.error('Token verification failed:', otpError);
+            setMode('error');
+          } else {
+            // Session established — show the password form
+            setMode('set_password');
+          }
+        });
+    } else {
+      // Fallback for old-style hash fragment tokens (#access_token=...)
+      // Supabase JS picks these up automatically via onAuthStateChange
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+          setMode('set_password');
+        }
+      });
 
-    return () => subscription.unsubscribe();
+      // No token found after a short wait -> show error
+      const timer = setTimeout(() => {
+        setMode((current) => (current === 'loading' ? 'error' : current));
+      }, 3000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
+    }
   }, []);
 
   const handleSetPassword = async (e: React.FormEvent) => {
