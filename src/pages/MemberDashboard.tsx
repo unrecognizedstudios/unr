@@ -39,6 +39,10 @@ const MemberDashboard = () => {
   const [website, setWebsite] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
+  // Portrait upload state
+  const [uploadingPortrait, setUploadingPortrait] = useState(false);
+  const [portraitPreview, setPortraitPreview] = useState<string | null>(null);
+
   // Portfolio management state
   const [isAddWorkOpen, setIsAddWorkOpen] = useState(false);
   const [workUploadType, setWorkUploadType] = useState<'upload' | 'instagram'>('upload');
@@ -189,6 +193,36 @@ const MemberDashboard = () => {
     toast({ title: 'Submitted!', description: 'Pending admin approval' });
   };
 
+  // Portrait upload
+  const handlePortraitUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !memberId) return;
+    const file = e.target.files[0];
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid File', description: 'Please upload an image file.', variant: 'destructive' });
+      return;
+    }
+
+    setUploadingPortrait(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `portraits/${memberId}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage.from('media').upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('media').getPublicUrl(path);
+      setPortraitPreview(data.publicUrl);
+
+      await submitChange('portrait', { portrait_path: path, portrait_url: data.publicUrl });
+      toast({ title: 'Portrait Submitted!', description: 'Pending admin approval.' });
+    } catch (err: any) {
+      toast({ title: 'Upload Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingPortrait(false);
+    }
+  };
+
   // Delete portfolio item
   const handleDeleteWork = (workId: string) => {
     submitChange('media_remove', { work_id: workId });
@@ -281,6 +315,44 @@ const MemberDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Portrait Upload */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Profile Photo</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                      {portraitPreview || member?.portrait_url ? (
+                        <img
+                          src={portraitPreview || member?.portrait_url}
+                          alt="Portrait"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon size={24} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <label
+                        htmlFor="portrait-upload"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-border bg-background text-foreground transition-colors ${isLocked || uploadingPortrait ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted cursor-pointer'}`}
+                      >
+                        <Upload size={14} />
+                        {uploadingPortrait ? 'Uploading...' : 'Upload Photo'}
+                      </label>
+                      <input
+                        id="portrait-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePortraitUpload}
+                        disabled={isLocked || uploadingPortrait}
+                        className="hidden"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WEBP. Requires admin approval.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Name</label>
                   <Input
