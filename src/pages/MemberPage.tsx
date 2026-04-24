@@ -10,37 +10,49 @@ import { useEffect, useState } from 'react';
 import Lightbox from '@/components/Lightbox';
 
 // ============================================
-// NEW: Instagram Embed Component
+// Instagram Embed Component — uses official /embed/ iframe
 // ============================================
 const InstagramEmbed = ({ url }: { url: string }) => {
-  useEffect(() => {
-    // Load Instagram embed script if not already loaded
-    if (!(window as any).instgrm) {
-      const script = document.createElement('script');
-      script.src = '//www.instagram.com/embed.js';
-      script.async = true;
-      document.body.appendChild(script);
-    } else {
-      // If already loaded, process embeds
-      (window as any).instgrm.Embeds.process();
+  const embedUrl = (() => {
+    try {
+      const u = new URL(url);
+      const clean = u.pathname.replace(/\/$/, '');
+      return `https://www.instagram.com${clean}/embed/`;
+    } catch {
+      return null;
     }
-  }, []);
+  })();
 
-  return (
-    <blockquote 
-      className="instagram-media" 
-      data-instgrm-permalink={url}
-      data-instgrm-version="14"
-      style={{ 
-        maxWidth: '540px',
-        width: '100%',
-        margin: '0 auto'
-      }}
-    >
-      <a href={url} target="_blank" rel="noopener noreferrer">
+  if (!embedUrl) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline text-sm"
+      >
         View on Instagram
       </a>
-    </blockquote>
+    );
+  }
+
+  return (
+    <div className="w-full flex justify-center">
+      <iframe
+        src={embedUrl}
+        className="rounded-lg border border-border"
+        style={{
+          width: '100%',
+          maxWidth: '540px',
+          minHeight: '600px',
+          border: 'none',
+        }}
+        scrolling="no"
+        allowTransparency={true}
+        allow="encrypted-media"
+        title="Instagram post"
+      />
+    </div>
   );
 };
 
