@@ -117,18 +117,21 @@ const MemberDashboard = () => {
 
   // File upload for portfolio
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0] || !memberId) return;
-    const file = e.target.files[0];
-    const currentCount = works?.length || 0;
-    
-    if (currentCount >= 6) {
-      toast({ 
-        title: 'Limit Reached', 
-        description: 'You can only have up to 6 portfolio items.', 
-        variant: 'destructive' 
-      });
-      return;
-    }
+  if (!e.target.files?.[0] || !memberId) return;
+  const file = e.target.files[0];
+
+  // ✅ Add this block:
+  const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+  if (file.size > MAX_SIZE) {
+    toast({
+      title: 'File Too Large',
+      description: 'Please upload a file under 50MB.',
+      variant: 'destructive',
+    });
+    return;
+  }
+
+  // ... rest of the function
 
     setUploadingFile(true);
     try {
