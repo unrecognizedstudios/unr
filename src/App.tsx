@@ -16,6 +16,7 @@ const Login = lazy(() => import("./pages/Login"));
 const MemberDashboard = lazy(() => import("./pages/MemberDashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 // Configure QueryClient with optimized settings
 const queryClient = new QueryClient({
@@ -62,6 +63,7 @@ const AnimatedRoutes = () => {
               </ProtectedRoute>
             } 
           />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
