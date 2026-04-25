@@ -3,6 +3,15 @@ import { mockMembers, getMembersByHierarchy } from '@/lib/mockData';
 import MemberGrid from '@/components/MemberGrid';
 import PageTransition from '@/components/PageTransition';
 
+// Skeleton grid that matches MemberGrid's layout exactly so there's no layout shift
+const MemberGridSkeleton = () => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 px-3 md:px-4">
+    {Array.from({ length: 8 }).map((_, i) => (
+      <div key={i} className="aspect-[3/4] bg-muted animate-pulse" />
+    ))}
+  </div>
+);
+
 const Index = () => {
   const { data: dbMembers, isLoading } = useMembers();
 
@@ -40,9 +49,7 @@ const Index = () => {
 
         <main className="flex-1">
           {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <p className="text-muted-foreground text-sm">Loading...</p>
-            </div>
+            <MemberGridSkeleton />
           ) : members && members.length > 0 ? (
             <MemberGrid members={members} />
           ) : null}
