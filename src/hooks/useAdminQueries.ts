@@ -1,15 +1,24 @@
-// src/hooks/useAdminQueries.ts
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Custom hook to consolidate all admin-related queries
- * This reduces code duplication and makes the AdminDashboard cleaner
- */
 export const useAdminQueries = () => {
-  // Pending changes
+  // Track which tabs have been opened so we only fire queries when needed
+  const [enabledQueries, setEnabledQueries] = useState({
+    pending: true,   // always load — it's the default tab and shows the badge count
+    members: true,   // always load — needed for the Posts tab filter too
+    roles: false,
+    analytics: false,
+  });
+
+  // Call this in AdminDashboard when the user clicks a tab
+  const enableQuery = (key: keyof typeof enabledQueries) => {
+    setEnabledQueries((prev) => ({ ...prev, [key]: true }));
+  };
+
   const pendingQuery = useQuery({
     queryKey: ['admin-pending'],
+    enabled: enabledQueries.pending,
     queryFn: async () => {
       const { data } = await supabase
         .from('pending_changes')
@@ -20,9 +29,9 @@ export const useAdminQueries = () => {
     },
   });
 
-  // All members
   const membersQuery = useQuery({
     queryKey: ['admin-members'],
+    enabled: enabledQueries.members,
     queryFn: async () => {
       const { data } = await supabase
         .from('members')
@@ -32,9 +41,9 @@ export const useAdminQueries = () => {
     },
   });
 
-  // Available roles
   const rolesQuery = useQuery({
     queryKey: ['admin-roles'],
+    enabled: enabledQueries.roles,
     queryFn: async () => {
       const { data } = await supabase
         .from('available_roles')
@@ -44,9 +53,11 @@ export const useAdminQueries = () => {
     },
   });
 
-  // Analytics
+  // Analytics is the heaviest query — two full table scans.
+  // Only runs after the user actually opens the Analytics tab.
   const analyticsQuery = useQuery({
     queryKey: ['admin-analytics'],
+    enabled: enabledQueries.analytics,
     queryFn: async () => {
       const now = new Date();
       const date30 = new Date(now);
@@ -92,6 +103,7 @@ export const useAdminQueries = () => {
     members: membersQuery.data,
     roles: rolesQuery.data,
     analytics: analyticsQuery.data,
-    isLoading: pendingQuery.isLoading || membersQuery.isLoading || rolesQuery.isLoading || analyticsQuery.isLoading,
+    isLoading: pendingQuery.isLoading || membersQuery.isLoading,
+    enableQuery,
   };
 };
