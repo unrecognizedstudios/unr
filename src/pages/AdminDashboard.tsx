@@ -161,6 +161,22 @@ const AdminDashboard = () => {
     }
   };
 
+  // Reorder a member's work — admin version, no approval needed
+  const reorderAdminWork = async (works: any[], workId: string, direction: 'up' | 'down') => {
+    const idx = works.findIndex((w: any) => w.id === workId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= works.length) return;
+    try {
+      await Promise.all([
+        supabase.from('member_works').update({ display_order: works[swapIdx].display_order }).eq('id', works[idx].id),
+        supabase.from('member_works').update({ display_order: works[idx].display_order }).eq('id', works[swapIdx].id),
+      ]);
+      qc.invalidateQueries({ queryKey: ['admin-all-works'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
   // Delete an individual member work (admin only)
   const deleteWork = async (workId: string, workType: string, storagePath?: string | null) => {
     try {
@@ -472,55 +488,87 @@ const AdminDashboard = () => {
 
         {/* Approvals Tab */}
         {activeTab === 'approvals' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {pending?.length === 0 && (
               <div className="text-center py-12">
                 <Check className="mx-auto h-12 w-12 text-green-500 mb-3" />
                 <p className="text-muted-foreground text-sm">No pending changes</p>
               </div>
             )}
-            {pending?.map((pc: any) => (
-              <div key={pc.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <span className="text-foreground font-heading tracking-wider text-sm">
-                      {pc.members?.name || 'Unknown'}
-                    </span>
-                    <span className="text-muted-foreground text-xs ml-2 capitalize">
-                      {pc.change_type.replace('_', ' ')}
-                    </span>
-                    <span className="text-muted-foreground text-xs ml-2">
-                      • {new Date(pc.created_at).toLocaleDateString()}
-                    </span>
+            {pending?.map((pc: any) => {
+              const data = pc.change_data as Record<string, any>;
+              return (
+                <div key={pc.id} className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <span className="text-foreground font-heading tracking-wider text-sm">{pc.members?.name || 'Unknown'}</span>
+                      <span className="text-muted-foreground text-xs ml-2 capitalize">{pc.change_type.replace('_', ' ')}</span>
+                      <span className="text-muted-foreground text-xs ml-2">• {new Date(pc.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => approveChange(pc)} className="text-green-500 hover:text-green-400 hover:bg-green-500/10" title="Approve"><Check size={16} /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => rejectChange(pc.id)} className="text-destructive hover:bg-destructive/10" title="Reject"><X size={16} /></Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => approveChange(pc)} 
-                      className="text-green-500 hover:text-green-400 hover:bg-green-500/10"
-                      title="Approve"
-                    >
-                      <Check size={16} />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => rejectChange(pc.id)} 
-                      className="text-destructive hover:bg-destructive/10"
-                      title="Reject"
-                    >
-                      <X size={16} />
-                    </Button>
-                  </div>
+
+                  {/* Portrait preview */}
+                  {pc.change_type === 'portrait' && data.portrait_url && (
+                    <div className="flex items-center gap-4 mt-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">New portrait</p>
+                        <img src={data.portrait_url} alt="new portrait" className="w-20 h-20 rounded-full object-cover" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bio/profile text */}
+                  {pc.change_type === 'bio' && (
+                    <div className="mt-2 space-y-1.5 text-xs bg-muted/30 rounded p-3">
+                      {data.name && <div className="flex gap-2"><span className="text-muted-foreground w-20 shrink-0">Name</span><span className="text-foreground">{data.name}</span></div>}
+                      {data.bio && <div className="flex gap-2"><span className="text-muted-foreground w-20 shrink-0">Bio</span><span className="text-foreground line-clamp-3">{data.bio}</span></div>}
+                      {data.instagram_url && <div className="flex gap-2"><span className="text-muted-foreground w-20 shrink-0">Instagram</span><span className="text-primary truncate">{data.instagram_url}</span></div>}
+                      {data.website_url && <div className="flex gap-2"><span className="text-muted-foreground w-20 shrink-0">Website</span><span className="text-primary truncate">{data.website_url}</span></div>}
+                    </div>
+                  )}
+
+                  {/* Uploaded image/video */}
+                  {pc.change_type === 'media_add' && data.storage_path && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">Uploaded {data.type}</p>
+                      <img src={supabase.storage.from('media').getPublicUrl(data.storage_path).data.publicUrl} alt="upload" className="rounded-lg max-h-52 object-cover" />
+                    </div>
+                  )}
+
+                  {/* Instagram embed */}
+                  {pc.change_type === 'media_add' && data.instagram_url && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-2">Instagram post to embed</p>
+                      <a href={data.instagram_url} target="_blank" rel="noopener noreferrer" className="text-primary text-xs underline break-all block mb-2">{data.instagram_url}</a>
+                      <div className="rounded-lg overflow-hidden border border-border">
+                        <iframe
+                          src={(() => { try { const u = new URL(data.instagram_url); return `https://www.instagram.com${u.pathname.replace(/\/$/, '')}/embed/`; } catch { return ''; } })()}
+                          className="w-full" style={{ minHeight: '420px', border: 'none' }}
+                          scrolling="no" allowTransparency={true} title="Instagram preview"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Media remove */}
+                  {pc.change_type === 'media_remove' && (
+                    <p className="text-xs text-muted-foreground mt-2 bg-muted/30 rounded p-2">Requesting removal of portfolio item</p>
+                  )}
+
+                  {/* Roles */}
+                  {pc.change_type === 'roles' && (
+                    <p className="text-xs text-muted-foreground mt-2 bg-muted/30 rounded p-2">
+                      {(data.role_ids as string[])?.length ? `${(data.role_ids as string[]).length} role(s) selected` : 'Clearing all roles'}
+                    </p>
+                  )}
                 </div>
-                <div className="bg-muted/30 rounded p-3">
-                  <pre className="text-muted-foreground text-xs overflow-auto whitespace-pre-wrap">
-                    {JSON.stringify(pc.change_data, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -704,7 +752,7 @@ const AdminDashboard = () => {
               )}
 
               <div className="grid grid-cols-1 gap-3">
-                {filteredWorks.map((work: any) => (
+                {filteredWorks.map((work: any, wi: number) => (
                   <div
                     key={work.id}
                     className="bg-card border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary/30 transition-colors"
@@ -755,6 +803,27 @@ const AdminDashboard = () => {
 
                     {/* Actions */}
                     <div className="flex gap-2 flex-shrink-0">
+                      {/* Reorder — only shown when filtering by a single member */}
+                      {postsFilterMemberId !== 'all' && (
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            onClick={() => reorderAdminWork(filteredWorks, work.id, 'up')}
+                            disabled={wi === 0}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
+                            title="Move up"
+                          >
+                            <ChevronUp size={15} />
+                          </button>
+                          <button
+                            onClick={() => reorderAdminWork(filteredWorks, work.id, 'down')}
+                            disabled={wi === filteredWorks.length - 1}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
+                            title="Move down"
+                          >
+                            <ChevronDown size={15} />
+                          </button>
+                        </div>
+                      )}
                       {(work.members as any)?.slug && (
                         <Button
                           size="sm"
