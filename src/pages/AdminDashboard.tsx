@@ -27,7 +27,7 @@ const AdminDashboard = () => {
   const [postsFilterMemberId, setPostsFilterMemberId] = useState<string>('all');
   
   // Use consolidated queries hook
-  const { pending, members, roles, analytics } = useAdminQueries();
+  const { pending, members, roles, analytics, enableQuery } = useAdminQueries();
 
   // All member works for the Posts tab
   const { data: allWorks } = useQuery({
@@ -454,7 +454,10 @@ const AdminDashboard = () => {
           {tabs.map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => {
+                setActiveTab(t.id);
+                enableQuery(t.id as any);
+              }}
               className={`font-heading text-sm tracking-widest px-4 py-2 border-b-2 transition-colors ${
                 activeTab === t.id 
                   ? 'border-primary text-foreground' 
