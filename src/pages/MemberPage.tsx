@@ -151,7 +151,15 @@ const MemberPage = () => {
         {/* Portrait Header */}
         {member.portrait_url ? (
           <div className="relative w-full aspect-[3/4] max-h-[70vh] overflow-hidden cursor-zoom-in" onClick={() => setLightboxSrc(member.portrait_url!)}>
-            <img src={member.portrait_url} alt={member.name} className="w-full h-full object-cover" />
+            {/* Skeleton shown until portrait loads */}
+            <div className="absolute inset-0 bg-muted animate-pulse" />
+            <img
+              src={member.portrait_url}
+              alt={member.name}
+              fetchPriority="high"
+              className="relative w-full h-full object-cover transition-opacity duration-500 opacity-0 [&[data-loaded]]:opacity-100"
+              onLoad={(e) => (e.currentTarget.dataset.loaded = 'true')}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
               <h1 className="font-heading text-foreground text-4xl md:text-6xl tracking-wider">{member.name}</h1>
