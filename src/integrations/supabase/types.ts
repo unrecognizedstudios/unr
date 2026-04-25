@@ -102,8 +102,9 @@ export type Database = {
           created_at: string
           display_order: number
           id: string
+          instagram_url: string | null
           member_id: string
-          storage_path: string
+          storage_path: string | null
           thumbnail_path: string | null
           type: string
         }
@@ -111,8 +112,9 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          instagram_url?: string | null
           member_id: string
-          storage_path: string
+          storage_path?: string | null
           thumbnail_path?: string | null
           type: string
         }
@@ -120,8 +122,9 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          instagram_url?: string | null
           member_id?: string
-          storage_path?: string
+          storage_path?: string | null
           thumbnail_path?: string | null
           type?: string
         }
@@ -257,7 +260,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "member"
-      member_title: "Founder" | "Partner" | "Member"
+      member_title: "Co-Founder" | "Founder" | "Partner" | "Member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -386,7 +389,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "member"],
-      member_title: ["Founder", "Partner", "Member"],
+      member_title: ["Co-Founder", "Founder", "Partner", "Member"],
     },
   },
 } as const
