@@ -41,18 +41,17 @@ const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) =
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <div
-      className="relative w-full h-full cursor-zoom-in"
-      onClick={onOpen}
-    >
+    <div className="relative w-full h-full cursor-zoom-in" onClick={onOpen}>
+      {/* Skeleton pulse behind the image */}
+      <div className="absolute inset-0 bg-muted animate-pulse" />
       <img
         src={work.src}
         alt=""
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-all duration-700 ${
-          loaded ? 'blur-0 scale-100' : 'blur-md scale-105'
-        }`}
         loading="lazy"
+        className={`relative w-full h-full object-cover transition-all duration-700 ${
+          loaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-md scale-105'
+        }`}
       />
     </div>
   );
@@ -60,6 +59,7 @@ const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) =
 
 const VideoItem = ({ work }: { work: MemberWork }) => {
   const [playing, setPlaying] = useState(false);
+  const [thumbLoaded, setThumbLoaded] = useState(false);
 
   if (playing) {
     return (
@@ -74,14 +74,19 @@ const VideoItem = ({ work }: { work: MemberWork }) => {
   }
 
   return (
-    <div
-      className="relative w-full h-full cursor-pointer group"
-      onClick={() => setPlaying(true)}
-    >
+    <div className="relative w-full h-full cursor-pointer group" onClick={() => setPlaying(true)}>
+      {/* Skeleton behind thumbnail */}
+      {!thumbLoaded && (
+        <div className="absolute inset-0 bg-muted animate-pulse" />
+      )}
       <img
         src={work.thumbnail || work.src}
         alt=""
-        className="w-full h-full object-cover"
+        loading="lazy"
+        onLoad={() => setThumbLoaded(true)}
+        className={`w-full h-full object-cover transition-opacity duration-500 ${
+          thumbLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
       />
       <div className="absolute inset-0 flex items-center justify-center bg-background/30 group-hover:bg-background/50 transition-colors">
         <div className="w-12 h-12 rounded-full border-2 border-foreground flex items-center justify-center">
