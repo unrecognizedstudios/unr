@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminQueries } from '@/hooks/useAdminQueries';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus } from 'lucide-react';
-import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon } from 'lucide-react';
+import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon, Instagram } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -21,10 +21,25 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'approvals' | 'members' | 'roles' | 'analytics'>('approvals');
+  const [activeTab, setActiveTab] = useState<'approvals' | 'members' | 'posts' | 'roles' | 'analytics'>('approvals');
+
+  // Posts management state
+  const [postsFilterMemberId, setPostsFilterMemberId] = useState<string>('all');
   
   // Use consolidated queries hook
   const { pending, members, roles, analytics } = useAdminQueries();
+
+  // All member works for the Posts tab
+  const { data: allWorks } = useQuery({
+    queryKey: ['admin-all-works'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('member_works')
+        .select('*, members(name, slug)')
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
 
   // Edit member dialog state
   const [editingMember, setEditingMember] = useState<any>(null);
@@ -44,7 +59,7 @@ const AdminDashboard = () => {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberSlug, setNewMemberSlug] = useState('');
-  const [newMemberTitle, setNewMemberTitle] = useState<'Founder' | 'Partner' | 'Member'>('Member');
+  const [newMemberTitle, setNewMemberTitle] = useState<'Co-Founder' | 'Founder' | 'Partner' | 'Member'>('Member');
 
   // Open edit dialog
   const openEditDialog = (member: any) => {
@@ -146,6 +161,25 @@ const AdminDashboard = () => {
     }
   };
 
+  // Delete an individual member work (admin only)
+  const deleteWork = async (workId: string, workType: string, storagePath?: string | null) => {
+    try {
+      // If it's a file-based work, remove from storage first
+      if (storagePath) {
+        await supabase.storage.from('media').remove([storagePath]);
+      }
+
+      const { error } = await supabase.from('member_works').delete().eq('id', workId);
+      if (error) throw error;
+
+      toast({ title: 'Post deleted', description: 'The portfolio item has been removed.' });
+      qc.invalidateQueries({ queryKey: ['admin-all-works'] });
+      qc.invalidateQueries({ queryKey: ['admin-members'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const approveChange = async (change: any) => {
     const { change_type, change_data, member_id, id } = change;
     const data = change_data as Record<string, any>;
@@ -183,15 +217,17 @@ const AdminDashboard = () => {
         // Support both uploaded files AND Instagram URLs
         const insertData: any = {
           member_id,
-          type: data.type,
           display_order: (count || 0),
         };
-        
+
         if (data.storage_path) {
           // Regular file upload
+          insertData.type = data.type || 'image';
           insertData.storage_path = data.storage_path;
+          if (data.thumbnail_path) insertData.thumbnail_path = data.thumbnail_path;
         } else if (data.instagram_url) {
-          // Instagram post embed
+          // Instagram post embed — type must be 'instagram', storage_path stays null
+          insertData.type = 'instagram';
           insertData.instagram_url = data.instagram_url;
         }
         
@@ -390,6 +426,7 @@ const AdminDashboard = () => {
   const tabs = [
     { id: 'approvals' as const, label: 'Approvals', count: pending?.length },
     { id: 'members' as const, label: 'Members' },
+    { id: 'posts' as const, label: 'Posts' },
     { id: 'roles' as const, label: 'Roles' },
     { id: 'analytics' as const, label: 'Analytics' },
   ];
@@ -555,6 +592,7 @@ const AdminDashboard = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="Co-Founder">Co-Founder</SelectItem>
                       <SelectItem value="Founder">Founder</SelectItem>
                       <SelectItem value="Partner">Partner</SelectItem>
                       <SelectItem value="Member">Member</SelectItem>
@@ -628,6 +666,145 @@ const AdminDashboard = () => {
             ))}
           </div>
         )}
+
+        {/* Posts Tab */}
+        {activeTab === 'posts' && (() => {
+          const filteredWorks = postsFilterMemberId === 'all'
+            ? (allWorks || [])
+            : (allWorks || []).filter((w: any) => w.member_id === postsFilterMemberId);
+
+          return (
+            <div className="space-y-4">
+              {/* Filter bar */}
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-sm text-muted-foreground shrink-0">
+                  {filteredWorks.length} post{filteredWorks.length !== 1 ? 's' : ''}
+                </p>
+                <Select value={postsFilterMemberId} onValueChange={setPostsFilterMemberId}>
+                  <SelectTrigger className="w-48 bg-card border-border text-foreground text-xs">
+                    <SelectValue placeholder="All members" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All members</SelectItem>
+                    {members?.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {filteredWorks.length === 0 && (
+                <div className="text-center py-12">
+                  <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground text-sm">No portfolio items found</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3">
+                {filteredWorks.map((work: any) => (
+                  <div
+                    key={work.id}
+                    className="bg-card border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary/30 transition-colors"
+                  >
+                    {/* Type badge / preview */}
+                    <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {work.type === 'instagram' ? (
+                        <Instagram size={22} className="text-pink-400" />
+                      ) : work.thumbnail_path ? (
+                        <img
+                          src={supabase.storage.from('media').getPublicUrl(work.thumbnail_path).data.publicUrl}
+                          alt="thumb"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : work.storage_path && work.type === 'image' ? (
+                        <img
+                          src={supabase.storage.from('media').getPublicUrl(work.storage_path).data.publicUrl}
+                          alt="thumb"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon size={22} className="text-muted-foreground" />
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground text-sm font-heading tracking-wider truncate">
+                        {(work.members as any)?.name || 'Unknown'}
+                      </p>
+                      <p className="text-muted-foreground text-xs capitalize mt-0.5">
+                        {work.type}
+                        {work.instagram_url && (
+                          <span className="ml-2 text-pink-400/80 truncate">
+                            — {work.instagram_url}
+                          </span>
+                        )}
+                        {work.storage_path && (
+                          <span className="ml-2 opacity-60 truncate">
+                            — {work.storage_path.split('/').pop()}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Slot {work.display_order + 1} • {new Date(work.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 flex-shrink-0">
+                      {(work.members as any)?.slug && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate(`/member/${(work.members as any).slug}`)}
+                          className="text-muted-foreground hover:text-foreground"
+                          title="View member page"
+                        >
+                          <Eye size={16} />
+                        </Button>
+                      )}
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10"
+                            title="Delete post"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this portfolio item?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove the{' '}
+                              {work.type === 'instagram' ? 'Instagram post' : work.type}{' '}
+                              from{' '}
+                              {(work.members as any)?.name || 'this member'}'s portfolio.
+                              {work.storage_path && ' The file will also be deleted from storage.'}
+                              {' '}This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteWork(work.id, work.type, work.storage_path)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Roles Tab */}
         {activeTab === 'roles' && (
@@ -926,6 +1103,7 @@ const AdminDashboard = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Co-Founder">Co-Founder</SelectItem>
                     <SelectItem value="Founder">Founder</SelectItem>
                     <SelectItem value="Partner">Partner</SelectItem>
                     <SelectItem value="Member">Member</SelectItem>
