@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,7 +11,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -20,15 +19,11 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
   build: {
-    // Fix for chunk size warning
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
-          // Split React and core libraries
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          
-          // Split Radix UI components into chunks
           'radix-dialogs': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-alert-dialog',
@@ -62,28 +57,16 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-tooltip',
             '@radix-ui/react-aspect-ratio',
           ],
-          
-          // Animation libraries
           'animation': ['framer-motion', 'embla-carousel-react'],
-          
-          // Form utilities
           'form-utils': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          
-          // Data/Query management
           'data-vendor': ['@tanstack/react-query', '@supabase/supabase-js'],
-          
-          // UI utilities
           'ui-utils': [
-            'clsx', 
-            'tailwind-merge', 
+            'clsx',
+            'tailwind-merge',
             'class-variance-authority',
             'lucide-react',
           ],
-          
-          // Charts and visualizations
           'charts': ['recharts'],
-          
-          // Miscellaneous
           'misc': [
             'cmdk',
             'date-fns',
@@ -97,15 +80,13 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    // Enable minification
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: mode === 'production', // Remove console.logs in production
+        drop_console: mode === 'production',
       },
     },
   },
-  // Optimize dependencies
   optimizeDeps: {
     include: [
       'react',
