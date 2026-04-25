@@ -113,16 +113,16 @@ const MemberPage = () => {
     ? mockWorks
     : (worksRaw || []).map((w) => {
         // If it's an Instagram post, return the URL
-        if (w.instagram_url) {
+        if (w.type === 'instagram' || w.instagram_url) {
           return {
             id: w.id,
-            type: 'instagram_post' as const,
+            type: 'instagram' as const,
             instagram_url: w.instagram_url,
           };
         }
-        
+
         // Otherwise, it's a regular uploaded file
-        const { data } = supabase.storage.from('media').getPublicUrl(w.storage_path);
+        const { data } = supabase.storage.from('media').getPublicUrl(w.storage_path!);
         return {
           id: w.id,
           type: w.type as 'image' | 'video',
@@ -214,12 +214,12 @@ const MemberPage = () => {
             <p className="text-muted-foreground text-xs tracking-widest uppercase mb-4">Portfolio</p>
             
             {/* Check if there are any Instagram posts */}
-            {works.some((w: any) => w.type === 'instagram_post') ? (
+            {works.some((w: any) => w.type === 'instagram') ? (
               // If there are Instagram posts, use custom grid
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {works.map((work: any) => (
                   <div key={work.id}>
-                    {work.type === 'instagram_post' && work.instagram_url ? (
+                    {work.type === 'instagram' && work.instagram_url ? (
                       <InstagramEmbed url={work.instagram_url} />
                     ) : (
                       <div className="aspect-square overflow-hidden rounded-lg">
@@ -244,7 +244,7 @@ const MemberPage = () => {
               </div>
             ) : (
               // If no Instagram posts, use the original WorkGrid component
-              <WorkGrid works={works.filter((w: any) => w.type !== 'instagram_post')} />
+              <WorkGrid works={works.filter((w: any) => w.type !== 'instagram')} />
             )}
           </div>
         )}
