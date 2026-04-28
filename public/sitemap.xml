@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://www.unrecognizedstudios.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Contact page -->
+  <url>
+    <loc>https://www.unrecognizedstudios.com/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!--
+    Member pages: add one <url> block per member using their slug.
+    Example:
+
+  <url>
+    <loc>https://www.unrecognizedstudios.com/member/jordan-lee</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+    Replace "jordan-lee" with each member's actual slug from your database.
+    You can also automate this with a build script if you have many members.
+  -->
+
+</urlset>
