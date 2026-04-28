@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus } from 'lucide-react';
-import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, Upload, Image as ImageIcon, Instagram } from 'lucide-react';
+import { LogOut, Check, X, ChevronUp, ChevronDown, Lock, Unlock, Plus, Trash2, Edit, Eye, EyeOff, Upload, Image as ImageIcon, Instagram } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -285,6 +285,18 @@ const AdminDashboard = () => {
     toast({ 
       title: currentLock ? 'Unlocked' : 'Locked',
       description: currentLock ? 'Member can now edit their profile' : 'Member editing disabled'
+    });
+  };
+
+  const toggleVisibility = async (memberId: string, currentlyHidden: boolean) => {
+    await supabase.from('members').update({ is_hidden: !currentlyHidden }).eq('id', memberId);
+    qc.invalidateQueries({ queryKey: ['admin-members'] });
+    qc.invalidateQueries({ queryKey: ['members'] });
+    toast({
+      title: currentlyHidden ? 'Profile visible' : 'Profile hidden',
+      description: currentlyHidden
+        ? 'This member now appears on the public main page.'
+        : 'This member is hidden from the public main page.',
     });
   };
 
@@ -633,7 +645,14 @@ const AdminDashboard = () => {
 
                   {/* Member Info */}
                   <div className="flex-1">
-                    <p className="text-foreground font-heading tracking-wider">{m.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-foreground font-heading tracking-wider">{m.name}</p>
+                      {m.is_hidden && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                          <EyeOff size={10} /> Hidden
+                        </span>
+                      )}
+                    </div>
                     <p className="text-muted-foreground text-xs">@{m.slug}</p>
                   </div>
 
@@ -680,6 +699,16 @@ const AdminDashboard = () => {
                       title={m.editing_locked ? "Unlock editing" : "Lock editing"}
                     >
                       {m.editing_locked ? <Lock size={16} /> : <Unlock size={16} />}
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleVisibility(m.id, m.is_hidden ?? false)}
+                      className={m.is_hidden ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-foreground'}
+                      title={m.is_hidden ? "Show on main page" : "Hide from main page"}
+                    >
+                      {m.is_hidden ? <EyeOff size={16} /> : <Eye size={16} />}
                     </Button>
 
                     <AlertDialog>

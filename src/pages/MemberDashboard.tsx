@@ -69,6 +69,7 @@ const MemberDashboard = () => {
   }
 
   const isLocked = member?.editing_locked;
+  const isHidden = (member as any)?.is_hidden ?? false;
 
   const submitChange = async (changeType: string, changeData: Record<string, any>) => {
     if (!memberId || isLocked) return;
@@ -235,6 +236,14 @@ const MemberDashboard = () => {
           <Alert className="mb-6 border-destructive/50 bg-destructive/10">
             <AlertDescription className="text-destructive">
               Your profile is currently locked by an admin. You cannot make changes.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isHidden && (
+          <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+            <AlertDescription className="text-amber-600 dark:text-amber-400">
+              Your profile is currently hidden from the public main page. An admin will make it visible once your account is fully set up.
             </AlertDescription>
           </Alert>
         )}
