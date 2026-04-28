@@ -146,6 +146,7 @@ export type Database = {
           editing_locked: boolean
           id: string
           instagram_url: string | null
+          is_hidden: boolean
           name: string
           portrait_url: string | null
           slug: string
@@ -161,6 +162,7 @@ export type Database = {
           editing_locked?: boolean
           id?: string
           instagram_url?: string | null
+          is_hidden?: boolean
           name: string
           portrait_url?: string | null
           slug: string
@@ -176,6 +178,7 @@ export type Database = {
           editing_locked?: boolean
           id?: string
           instagram_url?: string | null
+          is_hidden?: boolean
           name?: string
           portrait_url?: string | null
           slug?: string
