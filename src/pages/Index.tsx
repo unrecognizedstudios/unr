@@ -2,6 +2,7 @@ import { useMembers, MemberWithRoles } from '@/hooks/useMembers';
 import { mockMembers, getMembersByHierarchy } from '@/lib/mockData';
 import MemberGrid from '@/components/MemberGrid';
 import PageTransition from '@/components/PageTransition';
+import { useSEO } from '@/hooks/useSEO';
 
 // Skeleton grid that matches MemberGrid's layout exactly so there's no layout shift
 const MemberGridSkeleton = () => (
@@ -13,6 +14,7 @@ const MemberGridSkeleton = () => (
 );
 
 const Index = () => {
+  useSEO({ url: '/' });
   const { data: dbMembers, isLoading } = useMembers();
 
   const useMock = !isLoading && (!dbMembers || dbMembers.length === 0);

@@ -8,6 +8,7 @@ import WorkGrid from '@/components/WorkGrid';
 import PageTransition from '@/components/PageTransition';
 import { useEffect, useState } from 'react';
 import Lightbox from '@/components/Lightbox';
+import { useSEO } from '@/hooks/useSEO';
 
 // ============================================
 // Instagram Embed Component — uses official /embed/ iframe
@@ -78,6 +79,19 @@ const MemberPage = () => {
         roles: mockMember!.roles,
       }
     : dbMember;
+
+  // Dynamic SEO for each member's page
+  useSEO({
+    title: member?.name,
+    description: member?.bio
+      ? member.bio.slice(0, 155)
+      : member?.name
+      ? `${member.name} — ${member?.roles?.join(', ')} at UnRecognized Studios.`
+      : undefined,
+    image: member?.portrait_url || undefined,
+    url: slug ? `/member/${slug}` : undefined,
+    type: 'profile',
+  });
 
   const mockWorks = useMock
     ? mockMember!.works.map((w) => ({ id: w.id, type: w.type, src: w.src, thumbnail: w.thumbnail }))
