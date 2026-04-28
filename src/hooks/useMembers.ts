@@ -13,6 +13,7 @@ export interface MemberWithRoles {
   website_url: string;
   display_order: number;
   editing_locked: boolean;
+  is_hidden: boolean;
   roles: string[];
 }
 
@@ -40,8 +41,10 @@ async function fetchMembers(): Promise<MemberWithRoles[]> {
       website_url: m.website_url || '',
       display_order: m.display_order,
       editing_locked: m.editing_locked,
+      is_hidden: m.is_hidden ?? false,
       roles: m.member_roles?.map((mr: any) => mr.available_roles?.name).filter(Boolean) || [],
     }))
+    .filter((m) => !m.is_hidden)
     .sort((a, b) => {
       const td = titleOrder[a.title] - titleOrder[b.title];
       return td !== 0 ? td : a.display_order - b.display_order;
@@ -75,6 +78,7 @@ async function fetchMember(slug: string): Promise<MemberWithRoles | null> {
     website_url: m.website_url || '',
     display_order: m.display_order,
     editing_locked: m.editing_locked,
+    is_hidden: m.is_hidden ?? false,
     roles: m.member_roles?.map((mr: any) => mr.available_roles?.name).filter(Boolean) || [],
   };
 }
