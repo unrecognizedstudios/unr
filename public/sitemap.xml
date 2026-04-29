@@ -3,14 +3,14 @@
 
   <!-- Homepage -->
   <url>
-    <loc>https://www.unrecognizedstudios.com/</loc>
+    <loc>https://unrecognizedstudios.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <!-- Contact page -->
   <url>
-    <loc>https://www.unrecognizedstudios.com/contact</loc>
+    <loc>https://unrecognizedstudios.com/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -20,7 +20,7 @@
     Example:
 
   <url>
-    <loc>https://www.unrecognizedstudios.com/member/jordan-lee</loc>
+    <loc>https://unrecognizedstudios.com/member/jordan-lee</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

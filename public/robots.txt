@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://www.unrecognizedstudios.com/sitemap.xml
+Sitemap: https://unrecognizedstudios.com/sitemap.xml
