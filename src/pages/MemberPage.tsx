@@ -208,17 +208,7 @@ const MemberPage = () => {
             {/* Skeleton shown until portrait loads */}
             <div className="absolute inset-0 bg-muted animate-pulse" />
             <img
-              // Serve a 900 px wide optimised portrait — much smaller than the original
-              src={getOptimisedUrl(
-                // portrait_url may already be a full URL (mock data) — only transform
-                // Supabase storage paths; fall back to the raw URL for mocks
-                member.portrait_url.startsWith('http')
-                  ? member.portrait_url          // mock / external URL — use as-is
-                  : member.portrait_url,         // real path handled below
-                900,
-                undefined,
-                80
-              )}
+              src={member.portrait_url}
               alt={member.name}
               fetchPriority="high"
               decoding="async"
