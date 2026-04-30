@@ -57,6 +57,32 @@ const InstagramEmbed = ({ url }: { url: string }) => {
   );
 };
 
+// ============================================
+// Helper — build an optimised Supabase Storage URL
+// ============================================
+function getOptimisedUrl(
+  path: string,
+  width: number,
+  height?: number,
+  quality = 75
+): string {
+  const { data } = supabase.storage.from('media').getPublicUrl(path, {
+    transform: {
+      width,
+      ...(height ? { height } : {}),
+      resize: 'cover',
+      format: 'origin', // serves WebP to browsers that support it automatically
+      quality,
+    },
+  });
+  return data.publicUrl;
+}
+
+function getFullUrl(path: string): string {
+  const { data } = supabase.storage.from('media').getPublicUrl(path);
+  return data.publicUrl;
+}
+
 const MemberPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: dbMember, isLoading } = useMember(slug || '');
@@ -94,7 +120,13 @@ const MemberPage = () => {
   });
 
   const mockWorks = useMock
-    ? mockMember!.works.map((w) => ({ id: w.id, type: w.type, src: w.src, thumbnail: w.thumbnail }))
+    ? mockMember!.works.map((w) => ({
+        id: w.id,
+        type: w.type,
+        src: w.src,
+        fullSrc: w.src,
+        thumbnail: w.thumbnail,
+      }))
     : [];
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -121,12 +153,12 @@ const MemberPage = () => {
   const rolesDisplay = member.roles.join(' / ');
 
   // ============================================
-  // UPDATED: Build work items - handle both uploads AND Instagram embeds
+  // Build work items — optimised thumbnails + full-res lightbox URLs
   // ============================================
   const works = useMock
     ? mockWorks
     : (worksRaw || []).map((w) => {
-        // If it's an Instagram post, return the URL
+        // Instagram posts — no image processing needed
         if (w.type === 'instagram' || w.instagram_url) {
           return {
             id: w.id,
@@ -135,15 +167,20 @@ const MemberPage = () => {
           };
         }
 
-        // Otherwise, it's a regular uploaded file
-        const { data } = supabase.storage.from('media').getPublicUrl(w.storage_path!);
+        // Regular uploaded file — serve a small optimised thumbnail for the grid
+        // and keep the original URL for the lightbox
+        const src = getOptimisedUrl(w.storage_path!, 600, 600, 75);
+        const fullSrc = getFullUrl(w.storage_path!);
+        const thumbnail = w.thumbnail_path
+          ? getOptimisedUrl(w.thumbnail_path, 600, 600, 75)
+          : undefined;
+
         return {
           id: w.id,
           type: w.type as 'image' | 'video',
-          src: data.publicUrl,
-          thumbnail: w.thumbnail_path
-            ? supabase.storage.from('media').getPublicUrl(w.thumbnail_path).data.publicUrl
-            : undefined,
+          src,
+          fullSrc,
+          thumbnail,
         };
       });
 
@@ -164,13 +201,27 @@ const MemberPage = () => {
 
         {/* Portrait Header */}
         {member.portrait_url ? (
-          <div className="relative w-full aspect-[3/4] max-h-[70vh] overflow-hidden cursor-zoom-in" onClick={() => setLightboxSrc(member.portrait_url!)}>
+          <div
+            className="relative w-full aspect-[3/4] max-h-[70vh] overflow-hidden cursor-zoom-in"
+            onClick={() => setLightboxSrc(member.portrait_url!)}
+          >
             {/* Skeleton shown until portrait loads */}
             <div className="absolute inset-0 bg-muted animate-pulse" />
             <img
-              src={member.portrait_url}
+              // Serve a 900 px wide optimised portrait — much smaller than the original
+              src={getOptimisedUrl(
+                // portrait_url may already be a full URL (mock data) — only transform
+                // Supabase storage paths; fall back to the raw URL for mocks
+                member.portrait_url.startsWith('http')
+                  ? member.portrait_url          // mock / external URL — use as-is
+                  : member.portrait_url,         // real path handled below
+                900,
+                undefined,
+                80
+              )}
               alt={member.name}
               fetchPriority="high"
+              decoding="async"
               className="relative w-full h-full object-cover transition-opacity duration-500 opacity-0 [&[data-loaded]]:opacity-100"
               onLoad={(e) => (e.currentTarget.dataset.loaded = 'true')}
             />
@@ -228,16 +279,13 @@ const MemberPage = () => {
           </div>
         )}
 
-        {/* ============================================ */}
-        {/* UPDATED: Portfolio - Now handles Instagram embeds */}
-        {/* ============================================ */}
+        {/* Portfolio */}
         {works.length > 0 && (
           <div className="px-6 md:px-10 pb-16">
             <p className="text-muted-foreground text-xs tracking-widest uppercase mb-4">Portfolio</p>
-            
-            {/* Check if there are any Instagram posts */}
+
             {works.some((w: any) => w.type === 'instagram') ? (
-              // If there are Instagram posts, use custom grid
+              // Mixed grid — includes Instagram embeds
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {works.map((work: any) => (
                   <div key={work.id}>
@@ -246,17 +294,20 @@ const MemberPage = () => {
                     ) : (
                       <div className="aspect-square overflow-hidden rounded-lg">
                         {work.type === 'video' ? (
-                          <video 
-                            src={work.src} 
-                            controls 
+                          <video
+                            src={work.src}
+                            controls
                             className="w-full h-full object-cover"
+                            preload="none"        // don't download video bytes until user taps play
                           />
                         ) : (
-                          <img 
-                            src={work.src} 
-                            alt="Portfolio item" 
+                          <img
+                            src={work.src}
+                            alt="Portfolio item"
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-zoom-in"
-                            onClick={() => setLightboxSrc(work.src)}
+                            onClick={() => setLightboxSrc(work.fullSrc || work.src)}
                           />
                         )}
                       </div>
@@ -265,8 +316,11 @@ const MemberPage = () => {
                 ))}
               </div>
             ) : (
-              // If no Instagram posts, use the original WorkGrid component
-              <WorkGrid works={works.filter((w: any) => w.type !== 'instagram')} />
+              // Pure image/video grid — use WorkGrid
+              <WorkGrid
+                works={works.filter((w: any) => w.type !== 'instagram')}
+                onOpen={(fullSrc) => setLightboxSrc(fullSrc)}
+              />
             )}
           </div>
         )}
