@@ -3,12 +3,32 @@ import { motion } from 'framer-motion';
 import { MemberWork } from '@/lib/mockData';
 import Lightbox from '@/components/Lightbox';
 
-interface WorkGridProps {
-  works: MemberWork[];
+interface WorkItem extends MemberWork {
+  /** Full-resolution URL used by the lightbox (grid shows the compressed `src`) */
+  fullSrc?: string;
 }
 
-const WorkGrid = ({ works }: WorkGridProps) => {
+interface WorkGridProps {
+  works: WorkItem[];
+  /**
+   * Optional: called with the full-res URL when the user opens an image.
+   * If provided, the parent controls the lightbox (used by MemberPage).
+   * If omitted, WorkGrid manages its own internal lightbox.
+   */
+  onOpen?: (fullSrc: string) => void;
+}
+
+const WorkGrid = ({ works, onOpen }: WorkGridProps) => {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
+  const handleOpen = (work: WorkItem) => {
+    const url = work.fullSrc || work.src;
+    if (onOpen) {
+      onOpen(url);
+    } else {
+      setLightboxSrc(url);
+    }
+  };
 
   return (
     <>
@@ -24,12 +44,13 @@ const WorkGrid = ({ works }: WorkGridProps) => {
             {work.type === 'video' ? (
               <VideoItem work={work} />
             ) : (
-              <ImageItem work={work} onOpen={() => setLightboxSrc(work.src)} />
+              <ImageItem work={work} onOpen={() => handleOpen(work)} />
             )}
           </motion.div>
         ))}
       </div>
 
+      {/* Internal lightbox — only used when no onOpen prop is passed */}
       {lightboxSrc && (
         <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
@@ -37,7 +58,7 @@ const WorkGrid = ({ works }: WorkGridProps) => {
   );
 };
 
-const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) => {
+const ImageItem = ({ work, onOpen }: { work: WorkItem; onOpen: () => void }) => {
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -45,10 +66,11 @@ const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) =
       {/* Skeleton pulse behind the image */}
       <div className="absolute inset-0 bg-muted animate-pulse" />
       <img
-        src={work.src}
+        src={work.src}          // optimised thumbnail URL (600×600, WebP)
         alt=""
-        onLoad={() => setLoaded(true)}
         loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
         className={`relative w-full h-full object-cover transition-all duration-700 ${
           loaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-md scale-105'
         }`}
@@ -57,7 +79,7 @@ const ImageItem = ({ work, onOpen }: { work: MemberWork; onOpen: () => void }) =
   );
 };
 
-const VideoItem = ({ work }: { work: MemberWork }) => {
+const VideoItem = ({ work }: { work: WorkItem }) => {
   const [playing, setPlaying] = useState(false);
   const [thumbLoaded, setThumbLoaded] = useState(false);
 
@@ -66,8 +88,8 @@ const VideoItem = ({ work }: { work: MemberWork }) => {
       <video
         src={work.src}
         controls
-        className="w-full h-full object-cover"
         autoPlay={false}
+        className="w-full h-full object-cover"
         onEnded={() => setPlaying(false)}
       />
     );
@@ -83,6 +105,7 @@ const VideoItem = ({ work }: { work: MemberWork }) => {
         src={work.thumbnail || work.src}
         alt=""
         loading="lazy"
+        decoding="async"
         onLoad={() => setThumbLoaded(true)}
         className={`w-full h-full object-cover transition-opacity duration-500 ${
           thumbLoaded ? 'opacity-100' : 'opacity-0'
