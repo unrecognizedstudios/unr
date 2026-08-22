@@ -58,27 +58,10 @@ const InstagramEmbed = ({ url }: { url: string }) => {
 };
 
 // ============================================
-// Helper — build an optimised Supabase Storage URL
+// Helper — plain public Supabase Storage URL (no transforms)
+// Image Transformations are not available on the free tier
 // ============================================
-function getOptimisedUrl(
-  path: string,
-  width: number,
-  height?: number,
-  quality = 75
-): string {
-  const { data } = supabase.storage.from('media').getPublicUrl(path, {
-    transform: {
-      width,
-      ...(height ? { height } : {}),
-      resize: 'cover',
-      format: 'origin', // serves WebP to browsers that support it automatically
-      quality,
-    },
-  });
-  return data.publicUrl;
-}
-
-function getFullUrl(path: string): string {
+function getPublicUrl(path: string): string {
   const { data } = supabase.storage.from('media').getPublicUrl(path);
   return data.publicUrl;
 }
@@ -153,7 +136,7 @@ const MemberPage = () => {
   const rolesDisplay = member.roles.join(' / ');
 
   // ============================================
-  // Build work items — optimised thumbnails + full-res lightbox URLs
+  // Build work items — plain public URLs for both grid and lightbox
   // ============================================
   const works = useMock
     ? mockWorks
@@ -167,19 +150,17 @@ const MemberPage = () => {
           };
         }
 
-        // Regular uploaded file — serve a small optimised thumbnail for the grid
-        // and keep the original URL for the lightbox
-        const src = getOptimisedUrl(w.storage_path!, 600, 600, 75);
-        const fullSrc = getFullUrl(w.storage_path!);
+        // Regular uploaded file — use plain public URL for both grid and lightbox
+        const src = getPublicUrl(w.storage_path!);
         const thumbnail = w.thumbnail_path
-          ? getOptimisedUrl(w.thumbnail_path, 600, 600, 75)
+          ? getPublicUrl(w.thumbnail_path)
           : undefined;
 
         return {
           id: w.id,
           type: w.type as 'image' | 'video',
           src,
-          fullSrc,
+          fullSrc: src,
           thumbnail,
         };
       });
@@ -288,7 +269,7 @@ const MemberPage = () => {
                             src={work.src}
                             controls
                             className="w-full h-full object-cover"
-                            preload="none"        // don't download video bytes until user taps play
+                            preload="none"
                           />
                         ) : (
                           <img
